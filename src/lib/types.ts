@@ -28,6 +28,12 @@ export interface Game {
   steam_appid: string | null;
   steam_positive_pct: number | null;
   steam_review_count: number | null;
+  // GRAC(게임물관리위원회) 보강 필드
+  genres_ko: string[]; // 한국어 장르 (있으면 genres 대신 표시)
+  age_rating: string | null; // 이용등급 (전체이용가 ~ 청소년이용불가)
+  content_descriptors: string[]; // 내용정보 (폭력성, 사행성, 선정성 등)
+  publisher: string | null; // 배급사
+  source: string; // 'rawg' | 'sample' | 'grac'
 }
 
 export interface Review {

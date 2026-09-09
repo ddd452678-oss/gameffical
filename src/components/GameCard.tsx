@@ -29,7 +29,9 @@ export function GameCard({ game }: { game: Game }) {
         <div className="min-w-0">
           <h3 className="truncate text-[15px] font-bold">{game.name}</h3>
           <p className="mt-0.5 truncate text-xs text-text-dim">
-            {game.genres.slice(0, 3).join(" · ") || "장르 정보 없음"}
+            {(game.genres_ko.length ? game.genres_ko : game.genres)
+              .slice(0, 3)
+              .join(" · ") || "장르 정보 없음"}
           </p>
           <p className="mt-1 text-[11px] text-text-dim">
             {game.released?.slice(0, 4) ?? "출시일 미정"}

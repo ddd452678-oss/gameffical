@@ -93,7 +93,9 @@ export default async function GameDetailPage({
           <div className="min-w-0">
             <h1 className="text-2xl font-extrabold">{game.name}</h1>
             <p className="mt-1 text-sm text-text-dim">
-              {game.genres.join(" · ") || "장르 정보 없음"}
+              {(game.genres_ko.length ? game.genres_ko : game.genres).join(
+                " · ",
+              ) || "장르 정보 없음"}
             </p>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               {game.platform_kinds.map((k) => (
@@ -125,13 +127,26 @@ export default async function GameDetailPage({
             <h2 className="mb-2.5 text-lg font-extrabold">정보</h2>
             <div className="rounded-2xl bg-surface px-5 py-2 shadow-card">
               <MetaRow label="장르">
-                {game.genres.join(", ") || "—"}
+                {(game.genres_ko.length ? game.genres_ko : game.genres).join(
+                  ", ",
+                ) || "—"}
               </MetaRow>
               <MetaRow label="출시일">{game.released ?? "미정"}</MetaRow>
               <MetaRow label="플랫폼">
                 {game.raw_platforms.join(", ") ||
                   game.platform_kinds.map((k) => PLATFORM_LABELS[k]).join(", ")}
               </MetaRow>
+              {game.publisher && (
+                <MetaRow label="배급사">{game.publisher}</MetaRow>
+              )}
+              {game.age_rating && (
+                <MetaRow label="이용등급">{game.age_rating}</MetaRow>
+              )}
+              {game.content_descriptors.length > 0 && (
+                <MetaRow label="내용정보">
+                  {game.content_descriptors.join(", ")}
+                </MetaRow>
+              )}
             </div>
           </section>
 

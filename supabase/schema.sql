@@ -32,6 +32,12 @@ create table if not exists public.games (
   steam_appid       text,
   steam_positive_pct int,                             -- Steam 긍정 리뷰 비율 %
   steam_review_count int,
+  -- GRAC(게임물관리위원회) 보강 필드
+  genres_ko           text[] not null default '{}',   -- 한국어 장르 (있으면 genres 대신 표시)
+  age_rating          text,                            -- 이용등급 (전체이용가 ~ 청소년이용불가)
+  content_descriptors text[] not null default '{}',    -- 내용정보 (폭력성, 사행성, 선정성 ...)
+  publisher           text,                            -- 배급사
+  source              text not null default 'rawg',    -- 'rawg' | 'sample' | 'grac'
   metadata_updated_at timestamptz not null default now(),  -- 카탈로그 갱신 시각 (일~주 주기)
   ratings_updated_at  timestamptz not null default now(),  -- 평점 갱신 시각 (시간~일 주기)
   created_at          timestamptz not null default now()

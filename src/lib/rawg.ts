@@ -83,6 +83,11 @@ function toGame(item: RawgListItem, detail?: RawgDetail): Game {
     steam_appid: null,
     steam_positive_pct: null,
     steam_review_count: null,
+    genres_ko: [],
+    age_rating: null,
+    content_descriptors: [],
+    publisher: null,
+    source: "rawg",
   };
 }
 

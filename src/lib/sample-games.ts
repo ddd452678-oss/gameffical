@@ -1,11 +1,16 @@
 import type { Game } from "./types";
 
+type RawSample = Omit<
+  Game,
+  "genres_ko" | "age_rating" | "content_descriptors" | "publisher" | "source"
+>;
+
 /**
  * RAWG_API_KEY / Supabase 가 설정되지 않았을 때 사용하는 샘플 데이터.
  * 개발 서버를 키 없이도 바로 확인할 수 있도록 하기 위한 용도이며,
  * 실제 서비스에서는 RAWG API 응답이 이 자리를 대체한다.
  */
-export const SAMPLE_GAMES: Game[] = [
+const RAW_SAMPLES: RawSample[] = [
   {
     id: 3498,
     slug: "grand-theft-auto-v",
@@ -217,6 +222,15 @@ export const SAMPLE_GAMES: Game[] = [
     steam_review_count: 250000,
   },
 ];
+
+export const SAMPLE_GAMES: Game[] = RAW_SAMPLES.map((g) => ({
+  ...g,
+  genres_ko: [],
+  age_rating: null,
+  content_descriptors: [],
+  publisher: null,
+  source: "sample",
+}));
 
 export function getSampleGamesByPlatform(kind: string): Game[] {
   return SAMPLE_GAMES.filter((g) => g.platform_kinds.includes(kind as never));

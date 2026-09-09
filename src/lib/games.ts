@@ -6,7 +6,8 @@ import {
   searchGames,
 } from "./rawg";
 import { enrichSteamRatings, fetchSteamKoreanDescription } from "./steam";
-import { SEED_TITLES } from "./seed-titles";
+import { applyGrac, pickGracMatch, searchGrac, type GracItem } from "./grac";
+import { SEED_KO_BY_EN, SEED_TITLES } from "./seed-titles";
 import {
   getSampleGame,
   getSampleGamesByPlatform,
@@ -52,6 +53,11 @@ function rowToGame(row: Record<string, unknown>): Game {
     steam_appid: (row.steam_appid as string) ?? null,
     steam_positive_pct: (row.steam_positive_pct as number) ?? null,
     steam_review_count: (row.steam_review_count as number) ?? null,
+    genres_ko: (row.genres_ko as string[]) ?? [],
+    age_rating: (row.age_rating as string) ?? null,
+    content_descriptors: (row.content_descriptors as string[]) ?? [],
+    publisher: (row.publisher as string) ?? null,
+    source: (row.source as string) ?? "rawg",
   };
 }
 
@@ -73,6 +79,11 @@ function gameToRow(game: Game) {
     steam_appid: extractSteamAppId(game),
     steam_positive_pct: game.steam_positive_pct,
     steam_review_count: game.steam_review_count,
+    genres_ko: game.genres_ko ?? [],
+    age_rating: game.age_rating ?? null,
+    content_descriptors: game.content_descriptors ?? [],
+    publisher: game.publisher ?? null,
+    source: game.source ?? "rawg",
     metadata_updated_at: new Date().toISOString(),
   };
 }
@@ -153,6 +164,69 @@ export async function refreshCatalog(): Promise<{
 }
 
 /**
+ * 캐시된 게임을 GRAC(게임물관리위원회) 정보로 보강한다.
+ * genres_ko 가 아직 비어있는 게임을 이름으로 조회 → 매칭되면 한국어 장르·등급·
+ * 내용정보·배급사(및 한국어 개요)를 채운다. 한 번에 limit 개씩 처리(크론이 반복).
+ */
+export async function gracEnrichCached(limit = 150): Promise<{
+  ok: true;
+  scanned: number;
+  matched: number;
+  updated: number;
+}> {
+  const admin = getSupabaseAdmin();
+  if (!admin) return { ok: true, scanned: 0, matched: 0, updated: 0 };
+
+  const { data, error } = await admin
+    .from("games")
+    .select("*")
+    .order("rawg_ratings_count", { ascending: false })
+    .limit(1000);
+  if (error || !data || data.length === 0) {
+    return { ok: true, scanned: 0, matched: 0, updated: 0 };
+  }
+
+  const games = data
+    .map((r) => rowToGame(r as Record<string, unknown>))
+    .filter((g) => g.genres_ko.length === 0)
+    .slice(0, limit);
+  if (games.length === 0) {
+    return { ok: true, scanned: 0, matched: 0, updated: 0 };
+  }
+  const patched: Game[] = [];
+  const BATCH = 6;
+  for (let i = 0; i < games.length; i += BATCH) {
+    const slice = games.slice(i, i + BATCH);
+    const results = await Promise.all(
+      slice.map(async (g) => {
+        // 영문명 + (시드에 있으면) 한글 별칭 둘 다로 조회
+        const koAlias =
+          SEED_KO_BY_EN[g.name.toLowerCase().replace(/[^a-z0-9]/g, "")];
+        const queries = koAlias ? [koAlias, g.name] : [g.name];
+        const lists = await Promise.all(queries.map((q) => searchGrac(q)));
+        const flat: GracItem[] = lists.flat();
+        for (const q of queries) {
+          const match = pickGracMatch(q, flat);
+          if (match) return applyGrac(g, match);
+        }
+        return null;
+      }),
+    );
+    for (const r of results) if (r) patched.push(r);
+  }
+
+  // patched 는 완전한 Game 객체 → 전체 행 upsert (slug/name 등 NOT NULL 컬럼 포함)
+  if (patched.length > 0) await cacheGames(patched);
+
+  return {
+    ok: true,
+    scanned: games.length,
+    matched: patched.length,
+    updated: patched.length,
+  };
+}
+
+/**
  * 상세 페이지용 보강: 소개문(RAWG) + Steam 긍정비율.
  * 변경이 있었으면 changed=true 를 함께 반환한다(캐시 재기록 판단용).
  */
@@ -172,6 +246,14 @@ async function enrichForDetail(
           steam_appid: g.steam_appid ?? detail.steam_appid,
           steam_positive_pct: g.steam_positive_pct ?? detail.steam_positive_pct,
           steam_review_count: g.steam_review_count ?? detail.steam_review_count,
+          // GRAC 보강분은 유지
+          genres_ko: g.genres_ko.length ? g.genres_ko : detail.genres_ko,
+          age_rating: g.age_rating ?? detail.age_rating,
+          content_descriptors: g.content_descriptors.length
+            ? g.content_descriptors
+            : detail.content_descriptors,
+          publisher: g.publisher ?? detail.publisher,
+          source: g.source ?? detail.source,
         };
         changed = true;
       }
