@@ -15,3 +15,6 @@ next-env.d.ts
 *.pem
 npm-debug.log*
 .vercel
+
+# 개인 메모
+보완필요사항.txt
