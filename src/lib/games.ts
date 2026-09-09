@@ -1,6 +1,6 @@
 import { getSupabase, getSupabaseAdmin } from "./supabase";
 import { fetchGameDetail, fetchGamesByPlatform, searchGames } from "./rawg";
-import { enrichSteamRatings } from "./steam";
+import { enrichSteamRatings, fetchSteamKoreanDescription } from "./steam";
 import {
   getSampleGame,
   getSampleGamesByPlatform,
@@ -10,6 +10,11 @@ import type { Game, PlatformKind } from "./types";
 
 // 카탈로그(이름/이미지/장르 등) 갱신 주기: 7일
 const CATALOG_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+// 소개문에 한글이 들어있는지 (한국어 소개 보강 여부 판단용)
+const HANGUL_RE = /[가-힣]/;
+// 덜 정제된 HTML 태그/엔티티 흔적 (예전 캐시 자가 치유용)
+const HTML_ARTIFACT_RE = /<\/?[a-z]|&#|&[a-z]+;/i;
 
 function extractSteamAppId(game: Game): string | null {
   if (game.steam_appid) return game.steam_appid;
@@ -146,6 +151,21 @@ async function enrichForDetail(
   if (withSteam !== g) {
     g = withSteam;
     changed = true;
+  }
+
+  // 3) 한국어 소개 보강 (Steam 스토어)
+  //    - 소개가 없거나 / 한글이 아니거나 / 예전 캐시에 HTML 흔적이 남아있으면 교체 시도
+  if (
+    g.steam_appid &&
+    (!g.description ||
+      !HANGUL_RE.test(g.description) ||
+      HTML_ARTIFACT_RE.test(g.description))
+  ) {
+    const ko = await fetchSteamKoreanDescription(g.steam_appid);
+    if (ko) {
+      g = { ...g, description: ko };
+      changed = true;
+    }
   }
 
   return { game: g, changed };

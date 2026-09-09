@@ -38,6 +38,64 @@ export async function fetchSteamReviewSummary(
   }
 }
 
+interface SteamAppDetails {
+  [appid: string]: {
+    success: boolean;
+    data?: {
+      short_description?: string;
+      about_the_game?: string;
+      detailed_description?: string;
+    };
+  };
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) =>
+      String.fromCodePoint(parseInt(h, 16)),
+    )
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * Steam 스토어에서 한국어 게임 소개를 가져온다. 한국어 지원이 없으면 null.
+ * API 키 불필요 (스토어 공개 엔드포인트).
+ */
+export async function fetchSteamKoreanDescription(
+  appid: string,
+): Promise<string | null> {
+  try {
+    const url =
+      `https://store.steampowered.com/api/appdetails` +
+      `?appids=${appid}&l=korean`;
+    const res = await fetch(url, {
+      next: { revalidate: 60 * 60 * 24 * 7 }, // 7일
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as SteamAppDetails;
+    const entry = json[appid];
+    if (!entry?.success || !entry.data) return null;
+    const raw = entry.data.short_description || entry.data.about_the_game;
+    if (!raw) return null;
+    const text = stripHtml(raw);
+    return text.length >= 10 ? text : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * 게임에 Steam appid 가 있고 긍정비율이 아직 없으면 Steam 지표를 채워 반환한다.
  * 항상 새 객체를 반환하지 않는다 — 변경이 없으면 입력을 그대로 돌려준다(호출부에서 참조 비교 가능).
