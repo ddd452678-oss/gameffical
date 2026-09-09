@@ -20,6 +20,25 @@ const PLATFORM_LIST_LIMIT = 150;
 // 카탈로그(이름/이미지/장르 등) 갱신 주기: 7일
 const CATALOG_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+// 시드 타이틀(국내/주요 게임) 정규화 집합 — 목록 상단 노출용
+const SEED_NORM = new Set(
+  SEED_TITLES.map((t) => t.toLowerCase().replace(/[^a-z0-9]/g, "")),
+);
+const KOREAN_PUBLISHER_RE =
+  /넥슨|엔씨|엔씨소프트|스마일게이트|카카오게임즈|넷마블|펄어비스|위메이드|그라비티|웹젠|네오위즈|엑스엘게임즈|나딕|시프트업|라이엇게임즈코리아|블루홀|크래프톤|호요버스|호요|미호요/;
+
+/**
+ * 국내 게임 노출 우선도. RAWG 평점 참여자 수만으로는 국내 게임이 목록 밖으로
+ * 밀려나므로, 시드 타이틀 / GRAC 매칭 / 국내 배급사 게임을 앞으로 끌어올린다.
+ */
+function koreanRelevance(g: Game): number {
+  let s = 0;
+  if (SEED_NORM.has(g.name.toLowerCase().replace(/[^a-z0-9]/g, ""))) s += 2;
+  if (g.genres_ko.length > 0) s += 1;
+  if (g.publisher && KOREAN_PUBLISHER_RE.test(g.publisher)) s += 1;
+  return s;
+}
+
 // 소개문에 한글이 들어있는지 (한국어 소개 보강 여부 판단용)
 const HANGUL_RE = /[가-힣]/;
 // 덜 정제된 HTML 태그/엔티티 흔적 (예전 캐시 자가 치유용)
@@ -113,9 +132,16 @@ export async function listGamesByPlatform(kind: PlatformKind): Promise<Game[]> {
       .contains("platform_kinds", [kind])
       .gte("metadata_updated_at", freshAfter)
       .order("rawg_ratings_count", { ascending: false })
-      .limit(PLATFORM_LIST_LIMIT);
+      .limit(500);
     if (!error && data && data.length > 0) {
-      return data.map(rowToGame);
+      // 국내 게임(시드/GRAC/국내 배급사)을 앞으로, 그다음 RAWG 인기순
+      const games = data.map((r) => rowToGame(r as Record<string, unknown>));
+      games.sort(
+        (a, b) =>
+          koreanRelevance(b) - koreanRelevance(a) ||
+          b.rawg_ratings_count - a.rawg_ratings_count,
+      );
+      return games.slice(0, PLATFORM_LIST_LIMIT);
     }
   }
 
