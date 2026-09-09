@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SearchBox } from "@/components/SearchBox";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -41,6 +42,7 @@ export default function RootLayout({
                 </Link>
               ))}
             </nav>
+            <SearchBox />
           </div>
         </header>
         <main className="mx-auto max-w-6xl px-5 py-10">{children}</main>

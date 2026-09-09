@@ -1,5 +1,6 @@
 import { getSupabase, getSupabaseAdmin } from "./supabase";
-import { fetchGameDetail, fetchGamesByPlatform } from "./rawg";
+import { fetchGameDetail, fetchGamesByPlatform, searchGames } from "./rawg";
+import { enrichSteamRatings } from "./steam";
 import {
   getSampleGame,
   getSampleGamesByPlatform,
@@ -108,6 +109,49 @@ export async function listGamesByPlatform(kind: PlatformKind): Promise<Game[]> {
 }
 
 /**
+ * 상세 페이지용 보강: 소개문(RAWG) + Steam 긍정비율.
+ * 변경이 있었으면 changed=true 를 함께 반환한다(캐시 재기록 판단용).
+ */
+async function enrichForDetail(
+  game: Game,
+): Promise<{ game: Game; changed: boolean }> {
+  let g = game;
+  let changed = false;
+
+  // 1) 소개문이 없으면 RAWG 상세로 보강 (Steam 필드는 기존 값 유지)
+  if (!g.description) {
+    try {
+      const detail = await fetchGameDetail(g.id);
+      if (detail) {
+        g = {
+          ...detail,
+          steam_appid: g.steam_appid ?? detail.steam_appid,
+          steam_positive_pct: g.steam_positive_pct ?? detail.steam_positive_pct,
+          steam_review_count: g.steam_review_count ?? detail.steam_review_count,
+        };
+        changed = true;
+      }
+    } catch (e) {
+      console.error("[games] 상세 보강 실패:", e);
+    }
+  }
+
+  // 2) Steam appid 확정 후 긍정비율 보강
+  const appid = extractSteamAppId(g);
+  if (appid && appid !== g.steam_appid) {
+    g = { ...g, steam_appid: appid };
+    changed = true;
+  }
+  const withSteam = await enrichSteamRatings(g);
+  if (withSteam !== g) {
+    g = withSteam;
+    changed = true;
+  }
+
+  return { game: g, changed };
+}
+
+/**
  * 게임 상세 (id 또는 slug).
  */
 export async function getGame(idOrSlug: string): Promise<Game | null> {
@@ -120,19 +164,10 @@ export async function getGame(idOrSlug: string): Promise<Game | null> {
       ? await query.eq("id", numericId).maybeSingle()
       : await query.eq("slug", idOrSlug).maybeSingle();
     if (data) {
-      const game = rowToGame(data as Record<string, unknown>);
-      // 상세 소개문이 아직 없으면 RAWG 에서 보강
-      if (!game.description) {
-        try {
-          const detail = await fetchGameDetail(game.id);
-          if (detail) {
-            await cacheGames([detail]);
-            return detail;
-          }
-        } catch (e) {
-          console.error("[games] 상세 보강 실패:", e);
-        }
-      }
+      const { game, changed } = await enrichForDetail(
+        rowToGame(data as Record<string, unknown>),
+      );
+      if (changed) await cacheGames([game]);
       return game;
     }
   }
@@ -140,14 +175,52 @@ export async function getGame(idOrSlug: string): Promise<Game | null> {
   try {
     const detail = await fetchGameDetail(idOrSlug);
     if (detail) {
-      await cacheGames([detail]);
-      return detail;
+      const { game } = await enrichForDetail(detail);
+      await cacheGames([game]);
+      return game;
     }
   } catch (e) {
     console.error("[games] RAWG 상세 조회 실패, 샘플로 폴백:", e);
   }
 
   return getSampleGame(idOrSlug) ?? null;
+}
+
+/**
+ * 이름으로 게임 검색.
+ * 1) Supabase 캐시에서 이름 부분일치 (trigram 인덱스)
+ * 2) 없으면 RAWG 검색 → 캐시에 저장
+ * 3) RAWG 키도 없으면 샘플에서 필터
+ */
+export async function searchGamesByName(query: string): Promise<Game[]> {
+  const q = query.trim();
+  if (!q) return [];
+
+  const supabase = getSupabase();
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("games")
+      .select("*")
+      .ilike("name", `%${q}%`)
+      .order("rawg_ratings_count", { ascending: false })
+      .limit(24);
+    if (!error && data && data.length > 0) {
+      return data.map(rowToGame);
+    }
+  }
+
+  try {
+    const results = await searchGames(q);
+    if (results.length > 0) {
+      await cacheGames(results);
+      return results;
+    }
+  } catch (e) {
+    console.error("[games] RAWG 검색 실패, 샘플로 폴백:", e);
+  }
+
+  const lower = q.toLowerCase();
+  return SAMPLE_GAMES.filter((g) => g.name.toLowerCase().includes(lower));
 }
 
 /** 메인 페이지용: 플랫폼별 소수의 대표 게임 */
