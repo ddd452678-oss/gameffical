@@ -86,23 +86,80 @@ function toGame(item: RawgListItem, detail?: RawgDetail): Game {
   };
 }
 
-/** 플랫폼별 인기 게임 목록. RAWG 키가 없으면 빈 배열을 반환한다(호출부가 샘플로 폴백). */
+/**
+ * 플랫폼별 인기 게임 목록. RAWG 키가 없으면 빈 배열을 반환한다(호출부가 샘플로 폴백).
+ * pages 만큼 페이지네이션하며 id 기준 중복을 제거한다 (RAWG 한 페이지 최대 40).
+ */
 export async function fetchGamesByPlatform(
   kind: PlatformKind,
-  pageSize = 24,
+  pages = 3,
+  pageSize = 40,
 ): Promise<Game[]> {
   if (!hasRawg) return [];
-  const res = await fetch(
-    rawgUrl("/games", {
-      parent_platforms: KIND_TO_PARENT_QUERY[kind],
-      ordering: "-added",
-      page_size: pageSize,
-    }),
-    { next: { revalidate: 60 * 60 * 6 } }, // 6시간 캐시 (fetch 레벨)
-  );
-  if (!res.ok) throw new Error(`RAWG 목록 조회 실패: ${res.status}`);
-  const json = (await res.json()) as { results: RawgListItem[] };
-  return json.results.map((r) => toGame(r));
+  const out: Game[] = [];
+  const seen = new Set<number>();
+  for (let page = 1; page <= pages; page++) {
+    const res = await fetch(
+      rawgUrl("/games", {
+        parent_platforms: KIND_TO_PARENT_QUERY[kind],
+        ordering: "-added",
+        page_size: pageSize,
+        page,
+      }),
+      { next: { revalidate: 60 * 60 * 6 } }, // 6시간 캐시 (fetch 레벨)
+    );
+    if (!res.ok) {
+      if (page === 1) throw new Error(`RAWG 목록 조회 실패: ${res.status}`);
+      break;
+    }
+    const json = (await res.json()) as {
+      results: RawgListItem[];
+      next: string | null;
+    };
+    for (const r of json.results) {
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
+      out.push(toGame(r));
+    }
+    if (!json.next) break;
+  }
+  return out;
+}
+
+/**
+ * 타이틀 목록을 이름으로 검색해 각 타이틀의 대표 결과를 반환한다 (id 기준 중복 제거).
+ * 국내 온라인/모바일 게임처럼 -added 정렬로 밀리는 항목을 카탈로그에 편입하는 용도.
+ */
+export async function fetchGamesByTitles(titles: string[]): Promise<Game[]> {
+  if (!hasRawg || titles.length === 0) return [];
+  const byId = new Map<number, Game>();
+  const BATCH = 8;
+  for (let i = 0; i < titles.length; i += BATCH) {
+    const batch = titles.slice(i, i + BATCH);
+    const found = await Promise.all(
+      batch.map(async (title) => {
+        try {
+          const res = await fetch(
+            rawgUrl("/games", {
+              search: title,
+              search_precise: "true",
+              page_size: 1,
+            }),
+            { next: { revalidate: 60 * 60 * 24 } },
+          );
+          if (!res.ok) return null;
+          const json = (await res.json()) as { results: RawgListItem[] };
+          return json.results[0] ?? null;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    for (const r of found) {
+      if (r && !byId.has(r.id)) byId.set(r.id, toGame(r));
+    }
+  }
+  return [...byId.values()];
 }
 
 /** 게임 상세. RAWG 키가 없으면 null. */

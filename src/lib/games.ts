@@ -1,12 +1,20 @@
 import { getSupabase, getSupabaseAdmin } from "./supabase";
-import { fetchGameDetail, fetchGamesByPlatform, searchGames } from "./rawg";
+import {
+  fetchGameDetail,
+  fetchGamesByPlatform,
+  fetchGamesByTitles,
+  searchGames,
+} from "./rawg";
 import { enrichSteamRatings, fetchSteamKoreanDescription } from "./steam";
+import { SEED_TITLES } from "./seed-titles";
 import {
   getSampleGame,
   getSampleGamesByPlatform,
   SAMPLE_GAMES,
 } from "./sample-games";
 import type { Game, PlatformKind } from "./types";
+
+const PLATFORM_LIST_LIMIT = 150;
 
 // 카탈로그(이름/이미지/장르 등) 갱신 주기: 7일
 const CATALOG_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -94,14 +102,15 @@ export async function listGamesByPlatform(kind: PlatformKind): Promise<Game[]> {
       .contains("platform_kinds", [kind])
       .gte("metadata_updated_at", freshAfter)
       .order("rawg_ratings_count", { ascending: false })
-      .limit(48);
+      .limit(PLATFORM_LIST_LIMIT);
     if (!error && data && data.length > 0) {
       return data.map(rowToGame);
     }
   }
 
   try {
-    const fromRawg = await fetchGamesByPlatform(kind);
+    // 캐시 미스 시 즉시 응답용으로는 2페이지만 (깊은 채우기는 refreshCatalog/크론이 담당)
+    const fromRawg = await fetchGamesByPlatform(kind, 2);
     if (fromRawg.length > 0) {
       await cacheGames(fromRawg);
       return fromRawg;
@@ -111,6 +120,36 @@ export async function listGamesByPlatform(kind: PlatformKind): Promise<Game[]> {
   }
 
   return getSampleGamesByPlatform(kind);
+}
+
+/**
+ * 카탈로그 전체 갱신: 3개 플랫폼 심화 조회 + 국내 게임 시드 타이틀을 한 번에
+ * RAWG 에서 가져와 Supabase 에 캐시한다. /api/refresh 라우트와 Vercel 크론이 호출.
+ */
+export async function refreshCatalog(): Promise<{
+  ok: true;
+  platforms: Record<PlatformKind, number>;
+  seeded: number;
+  cached: number;
+}> {
+  const [pc, mobile, console_, seeded] = await Promise.all([
+    fetchGamesByPlatform("pc", 3),
+    fetchGamesByPlatform("mobile", 3),
+    fetchGamesByPlatform("console", 3),
+    fetchGamesByTitles(SEED_TITLES),
+  ]);
+
+  const byId = new Map<number, Game>();
+  for (const g of [...pc, ...mobile, ...console_, ...seeded]) byId.set(g.id, g);
+  const all = [...byId.values()];
+  await cacheGames(all);
+
+  return {
+    ok: true,
+    platforms: { pc: pc.length, mobile: mobile.length, console: console_.length },
+    seeded: seeded.length,
+    cached: all.length,
+  };
 }
 
 /**
@@ -251,9 +290,9 @@ export async function listFeatured(): Promise<Record<PlatformKind, Game[]>> {
     listGamesByPlatform("console"),
   ]);
   return {
-    pc: pc.slice(0, 6),
-    mobile: mobile.slice(0, 6),
-    console: console_.slice(0, 6),
+    pc: pc.slice(0, 12),
+    mobile: mobile.slice(0, 12),
+    console: console_.slice(0, 12),
   };
 }
 

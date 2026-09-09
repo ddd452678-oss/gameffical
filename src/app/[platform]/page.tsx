@@ -4,7 +4,7 @@ import { GameGrid } from "@/components/GameCard";
 import { listGamesByPlatform } from "@/lib/games";
 import { PLATFORM_LABELS, type PlatformKind } from "@/lib/types";
 
-export const revalidate = 3600;
+export const revalidate = 600;
 
 const VALID: PlatformKind[] = ["pc", "mobile", "console"];
 
