@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ScoreBadge } from "./ScoreBadge";
-import { computeOverallScore, type Game } from "@/lib/types";
+import { computeOverallScore, displayTitle, type Game } from "@/lib/types";
 
 export function GameCard({ game }: { game: Game }) {
   const score = computeOverallScore(game);
@@ -27,10 +27,7 @@ export function GameCard({ game }: { game: Game }) {
       <div className="flex items-start gap-3 p-3.5">
         <ScoreBadge score={score} size="sm" />
         <div className="min-w-0">
-          <h3 className="truncate text-[15px] font-bold">{game.name}</h3>
-          {game.name_ko && (
-            <p className="truncate text-xs text-text-dim">{game.name_ko}</p>
-          )}
+          <h3 className="truncate text-[15px] font-bold">{displayTitle(game)}</h3>
           <p className="mt-0.5 truncate text-xs text-text-dim">
             {(game.genres_ko.length ? game.genres_ko : game.genres)
               .slice(0, 3)

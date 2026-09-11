@@ -9,6 +9,7 @@ import { getGame } from "@/lib/games";
 import { getReviewStats, listReviews } from "@/lib/reviews";
 import {
   computeOverallScore,
+  displayTitle,
   PLATFORM_LABELS,
   type Game,
 } from "@/lib/types";
@@ -23,9 +24,8 @@ export async function generateMetadata({
   const { id } = await params;
   const game = await getGame(id);
   if (!game) return { title: "게임을 찾을 수 없습니다 — 겜피셜" };
-  const displayName = game.name_ko ? `${game.name} (${game.name_ko})` : game.name;
   return {
-    title: `${displayName} — 겜피셜`,
+    title: `${displayTitle(game)} — 겜피셜`,
     description: game.description?.slice(0, 150) ?? undefined,
   };
 }
@@ -92,10 +92,7 @@ export default async function GameDetailPage({
         <div className="flex items-start gap-4 p-6">
           <ScoreBadge score={overall} size="lg" />
           <div className="min-w-0">
-            <h1 className="text-2xl font-extrabold">{game.name}</h1>
-            {game.name_ko && (
-              <p className="mt-0.5 text-sm text-text-dim">{game.name_ko}</p>
-            )}
+            <h1 className="text-2xl font-extrabold">{displayTitle(game)}</h1>
             <p className="mt-1 text-sm text-text-dim">
               {(game.genres_ko.length ? game.genres_ko : game.genres).join(
                 " · ",

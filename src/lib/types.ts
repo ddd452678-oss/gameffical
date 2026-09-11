@@ -65,6 +65,14 @@ export interface ReviewStats {
 }
 
 /**
+ * 카드/상세 제목에 쓰는 표시용 이름. 한글명이 있으면 "한글명 | 영문명" 형태로,
+ * 없으면 원래 이름만 반환한다.
+ */
+export function displayTitle(game: Game): string {
+  return game.name_ko ? `${game.name_ko} | ${game.name}` : game.name;
+}
+
+/**
  * 종합 평점(0~100). 공식 데이터가 있으면 가중 평균해서 계산한다.
  * - metacritic (0~100)          가중치 0.5
  * - rawg_rating (0~5 → 0~100)   가중치 0.3

@@ -7,7 +7,7 @@ import {
 } from "./rawg";
 import { enrichSteamRatings, fetchSteamKoreanDescription } from "./steam";
 import { applyGrac, pickGracMatch, searchGrac, type GracItem } from "./grac";
-import { SEED_KO_BY_EN, SEED_TITLES } from "./seed-titles";
+import { SEED_GAMES, SEED_KO_BY_EN, SEED_TITLES } from "./seed-titles";
 import {
   getSampleGame,
   getSampleGamesByPlatform,
@@ -391,30 +391,66 @@ export async function getGame(idOrSlug: string): Promise<Game | null> {
 }
 
 /**
- * 이름으로 게임 검색.
- * 1) Supabase 캐시에서 이름 부분일치 (trigram 인덱스)
- * 2) 없으면 RAWG 검색 → 캐시에 저장
+ * 검색어(한글)가 시드 목록의 한글명에 부분일치하면 대응하는 영문명을 반환한다.
+ * RAWG 는 영문 검색만 지원하므로, 한글 검색어를 영문 검색어로 바꿔주는 용도.
+ */
+function seedEnglishMatches(query: string): string[] {
+  // 띄어쓰기 차이(예: "리그오브레전드" vs "리그 오브 레전드")를 무시하고 비교한다.
+  const stripSpace = (s: string) => s.replace(/\s+/g, "");
+  const nq = stripSpace(query);
+  const seen = new Set<string>();
+  for (const s of SEED_GAMES) {
+    if (s.ko && stripSpace(s.ko).includes(nq)) seen.add(s.en);
+  }
+  return [...seen];
+}
+
+/**
+ * 이름으로 게임 검색 (영문/한글 모두 지원).
+ * 1) Supabase 캐시에서 이름(영문/한글) 부분일치 (trigram 인덱스)
+ * 2) 없으면 RAWG 검색 → 캐시에 저장 (한글 검색어는 시드 목록으로 영문 변환)
  * 3) RAWG 키도 없으면 샘플에서 필터
  */
 export async function searchGamesByName(query: string): Promise<Game[]> {
   const q = query.trim();
   if (!q) return [];
+  const seedEnMatches = seedEnglishMatches(q);
 
   const supabase = getSupabase();
   if (supabase) {
-    const { data, error } = await supabase
-      .from("games")
-      .select("*")
-      .or(`name.ilike.%${q}%,name_ko.ilike.%${q}%`)
-      .order("rawg_ratings_count", { ascending: false })
-      .limit(24);
-    if (!error && data && data.length > 0) {
-      return data.map(rowToGame);
+    // .or() 는 값에 특수문자가 있으면 이스케이프가 까다로워서, 대신 컬럼별로
+    // 나눠 안전한 .ilike() 로 조회한 뒤 합친다.
+    const queries = [
+      supabase.from("games").select("*").ilike("name", `%${q}%`),
+      supabase.from("games").select("*").ilike("name_ko", `%${q}%`),
+      ...seedEnMatches.map((en) =>
+        supabase.from("games").select("*").ilike("name", `%${en}%`),
+      ),
+    ];
+    const responses = await Promise.all(
+      queries.map((qb) =>
+        qb.order("rawg_ratings_count", { ascending: false }).limit(24),
+      ),
+    );
+    const byId = new Map<number, Game>();
+    for (const r of responses) {
+      if (r.error || !r.data) continue;
+      for (const row of r.data) {
+        const g = rowToGame(row as Record<string, unknown>);
+        byId.set(g.id, g);
+      }
+    }
+    if (byId.size > 0) {
+      return [...byId.values()]
+        .sort((a, b) => b.rawg_ratings_count - a.rawg_ratings_count)
+        .slice(0, 24);
     }
   }
 
   try {
-    const results = (await searchGames(q)).map(withSeedKoName);
+    // 한글 검색어가 시드 목록에 매칭되면 그 영문명으로 RAWG 검색
+    const rawgQuery = seedEnMatches[0] ?? q;
+    const results = (await searchGames(rawgQuery)).map(withSeedKoName);
     if (results.length > 0) {
       await cacheGames(results);
       return results;
