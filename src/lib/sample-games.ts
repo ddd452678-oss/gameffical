@@ -1,8 +1,14 @@
+import { SEED_KO_BY_EN } from "./seed-titles";
 import type { Game } from "./types";
 
 type RawSample = Omit<
   Game,
-  "genres_ko" | "age_rating" | "content_descriptors" | "publisher" | "source"
+  | "genres_ko"
+  | "age_rating"
+  | "content_descriptors"
+  | "publisher"
+  | "source"
+  | "name_ko"
 >;
 
 /**
@@ -230,6 +236,7 @@ export const SAMPLE_GAMES: Game[] = RAW_SAMPLES.map((g) => ({
   content_descriptors: [],
   publisher: null,
   source: "sample",
+  name_ko: SEED_KO_BY_EN[g.name.toLowerCase().replace(/[^a-z0-9]/g, "")] ?? null,
 }));
 
 export function getSampleGamesByPlatform(kind: string): Game[] {

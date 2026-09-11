@@ -161,10 +161,21 @@ export function gracPlatformKind(platform: string): PlatformKind | null {
   return null;
 }
 
+/**
+ * GRAC gametitle 은 보통 "한글명(English name)" 형태다. 괄호 앞부분을 한글명
+ * 후보로 뽑아, 실제로 한글이 포함된 경우에만 반환한다.
+ */
+function extractKoreanTitle(gametitle: string): string | null {
+  const parenAt = gametitle.lastIndexOf("(");
+  const base = (parenAt > 0 ? gametitle.slice(0, parenAt) : gametitle).trim();
+  return /[가-힣]/.test(base) ? base : null;
+}
+
 /** GRAC 항목으로 기존 Game 을 보강한 새 객체를 반환한다. */
 export function applyGrac(game: Game, item: GracItem): Game {
   const next: Game = {
     ...game,
+    name_ko: game.name_ko ?? extractKoreanTitle(item.gametitle),
     genres_ko:
       item.genre && !JUNK_GENRES.has(item.genre)
         ? [item.genre]

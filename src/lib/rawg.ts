@@ -70,6 +70,7 @@ function toGame(item: RawgListItem, detail?: RawgDetail): Game {
     id: item.id,
     slug: item.slug,
     name: item.name,
+    name_ko: null,
     description: detail?.description_raw?.trim() || null,
     background_image: item.background_image,
     genres: (item.genres ?? []).map((g) => g.name),

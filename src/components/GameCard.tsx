@@ -28,6 +28,9 @@ export function GameCard({ game }: { game: Game }) {
         <ScoreBadge score={score} size="sm" />
         <div className="min-w-0">
           <h3 className="truncate text-[15px] font-bold">{game.name}</h3>
+          {game.name_ko && (
+            <p className="truncate text-xs text-text-dim">{game.name_ko}</p>
+          )}
           <p className="mt-0.5 truncate text-xs text-text-dim">
             {(game.genres_ko.length ? game.genres_ko : game.genres)
               .slice(0, 3)

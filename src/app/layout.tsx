@@ -13,6 +13,8 @@ const NAV = [
   { href: "/pc", label: "PC" },
   { href: "/mobile", label: "모바일" },
   { href: "/console", label: "콘솔" },
+  { href: "/domestic", label: "국내" },
+  { href: "/overseas", label: "해외" },
 ];
 
 export default function RootLayout({

@@ -28,6 +28,35 @@ const KOREAN_PUBLISHER_RE =
   /넥슨|엔씨|엔씨소프트|스마일게이트|카카오게임즈|넷마블|펄어비스|위메이드|그라비티|웹젠|네오위즈|엑스엘게임즈|나딕|시프트업|라이엇게임즈코리아|블루홀|크래프톤|호요버스|호요|미호요/;
 
 /**
+ * 실제 국내(한국) 게임사 배급/개발 게임 판별용 — GRAC 등록 업체명(publisher) 기준.
+ * 위 KOREAN_PUBLISHER_RE 는 "한국 유저 관련도"(목록 노출 우선순위) 용도라
+ * 라이엇게임즈코리아·호요버스처럼 해외 원산 게임의 한국 법인/배급명도 포함하지만,
+ * 국내/해외 카테고리 분류는 실제 한국 게임사만 좁혀서 사용한다.
+ */
+const DOMESTIC_PUBLISHER_RE =
+  /넥슨|엔씨소프트|스마일게이트|카카오게임즈|넷마블|펄어비스|위메이드|그라비티|웹젠|네오위즈|엑스엘게임즈|나딕|시프트업|블루홀|크래프톤|컴투스|데브시스터즈|라인게임즈/;
+
+/**
+ * 국내(한국) 게임 여부. GRAC 로 배급사 정보가 채워진 게임만 판별 가능하므로
+ * best-effort 이며, 정보가 없으면 해외 카테고리로 분류된다.
+ */
+export function isDomesticGame(game: Game): boolean {
+  return !!game.publisher && DOMESTIC_PUBLISHER_RE.test(game.publisher);
+}
+
+/** 정규화된 영문명 매칭 키 (공백/기호 제거, 소문자) */
+function normKey(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/** 한글 이름이 비어있으면 시드 목록의 한글명으로 채운다 (GRAC 매칭값이 우선). */
+function withSeedKoName(game: Game): Game {
+  if (game.name_ko) return game;
+  const ko = SEED_KO_BY_EN[normKey(game.name)];
+  return ko ? { ...game, name_ko: ko } : game;
+}
+
+/**
  * 국내 게임 노출 우선도. RAWG 평점 참여자 수만으로는 국내 게임이 목록 밖으로
  * 밀려나므로, 시드 타이틀 / GRAC 매칭 / 국내 배급사 게임을 앞으로 끌어올린다.
  */
@@ -59,6 +88,7 @@ function rowToGame(row: Record<string, unknown>): Game {
     id: Number(row.id),
     slug: String(row.slug),
     name: String(row.name),
+    name_ko: (row.name_ko as string) ?? null,
     description: (row.description as string) ?? null,
     background_image: (row.background_image as string) ?? null,
     genres: (row.genres as string[]) ?? [],
@@ -85,6 +115,7 @@ function gameToRow(game: Game) {
     id: game.id,
     slug: game.slug,
     name: game.name,
+    name_ko: game.name_ko ?? null,
     description: game.description,
     background_image: game.background_image,
     genres: game.genres,
@@ -110,7 +141,7 @@ function gameToRow(game: Game) {
 async function cacheGames(games: Game[]): Promise<void> {
   const admin = getSupabaseAdmin();
   if (!admin || games.length === 0) return;
-  const rows = games.map(gameToRow);
+  const rows = games.map((g) => gameToRow(withSeedKoName(g)));
   const { error } = await admin.from("games").upsert(rows, { onConflict: "id" });
   if (error) console.error("[games] 캐시 upsert 실패:", error.message);
 }
@@ -147,7 +178,7 @@ export async function listGamesByPlatform(kind: PlatformKind): Promise<Game[]> {
 
   try {
     // 캐시 미스 시 즉시 응답용으로는 2페이지만 (깊은 채우기는 refreshCatalog/크론이 담당)
-    const fromRawg = await fetchGamesByPlatform(kind, 2);
+    const fromRawg = (await fetchGamesByPlatform(kind, 2)).map(withSeedKoName);
     if (fromRawg.length > 0) {
       await cacheGames(fromRawg);
       return fromRawg;
@@ -342,7 +373,7 @@ export async function getGame(idOrSlug: string): Promise<Game | null> {
   try {
     const detail = await fetchGameDetail(idOrSlug);
     if (detail) {
-      const { game } = await enrichForDetail(detail);
+      const { game } = await enrichForDetail(withSeedKoName(detail));
       await cacheGames([game]);
       return game;
     }
@@ -368,7 +399,7 @@ export async function searchGamesByName(query: string): Promise<Game[]> {
     const { data, error } = await supabase
       .from("games")
       .select("*")
-      .ilike("name", `%${q}%`)
+      .or(`name.ilike.%${q}%,name_ko.ilike.%${q}%`)
       .order("rawg_ratings_count", { ascending: false })
       .limit(24);
     if (!error && data && data.length > 0) {
@@ -377,7 +408,7 @@ export async function searchGamesByName(query: string): Promise<Game[]> {
   }
 
   try {
-    const results = await searchGames(q);
+    const results = (await searchGames(q)).map(withSeedKoName);
     if (results.length > 0) {
       await cacheGames(results);
       return results;
@@ -387,7 +418,32 @@ export async function searchGamesByName(query: string): Promise<Game[]> {
   }
 
   const lower = q.toLowerCase();
-  return SAMPLE_GAMES.filter((g) => g.name.toLowerCase().includes(lower));
+  return SAMPLE_GAMES.filter(
+    (g) =>
+      g.name.toLowerCase().includes(lower) ||
+      (g.name_ko && g.name_ko.includes(q)),
+  );
+}
+
+/**
+ * 국내/해외 카테고리용: PC·모바일·콘솔 전체에서 모아 배급사 기준으로 분류한다.
+ * (isDomesticGame 은 GRAC 배급사 정보가 채워진 게임만 판별 가능한 best-effort 기준)
+ */
+export async function listGamesByRegion(
+  region: "domestic" | "overseas",
+): Promise<Game[]> {
+  const featured = await Promise.all([
+    listGamesByPlatform("pc"),
+    listGamesByPlatform("mobile"),
+    listGamesByPlatform("console"),
+  ]);
+  const byId = new Map<number, Game>();
+  for (const g of featured.flat()) byId.set(g.id, g);
+  const filtered = [...byId.values()].filter(
+    (g) => isDomesticGame(g) === (region === "domestic"),
+  );
+  filtered.sort((a, b) => b.rawg_ratings_count - a.rawg_ratings_count);
+  return filtered;
 }
 
 /** 메인 페이지용: 플랫폼별 소수의 대표 게임 */

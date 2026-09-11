@@ -15,6 +15,7 @@ export interface Game {
   id: number;
   slug: string;
   name: string;
+  name_ko: string | null; // 한국어 이름 (시드 목록 또는 GRAC 등록명 기준, 없으면 null)
   description: string | null;
   background_image: string | null;
   genres: string[];

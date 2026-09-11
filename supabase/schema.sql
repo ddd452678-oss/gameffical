@@ -18,6 +18,7 @@ create table if not exists public.games (
   id                bigint primary key,               -- RAWG 게임 id (원본 id 그대로 사용)
   slug              text not null unique,
   name              text not null,
+  name_ko           text,                             -- 한국어 이름 (시드 목록 / GRAC 등록명 기준)
   description       text,                             -- 한 문단 소개 (plain text)
   background_image  text,                             -- 대표 이미지 URL
   genres            text[] not null default '{}',
@@ -45,6 +46,7 @@ create table if not exists public.games (
 
 create index if not exists games_platform_kinds_idx on public.games using gin (platform_kinds);
 create index if not exists games_name_trgm_idx on public.games using gin (name extensions.gin_trgm_ops);
+create index if not exists games_name_ko_trgm_idx on public.games using gin (name_ko extensions.gin_trgm_ops);
 
 -- ───────────────────────────────────────────────
 -- 2. reviews : 100% 자체 생성 유저 리뷰
