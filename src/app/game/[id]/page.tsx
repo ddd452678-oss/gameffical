@@ -92,7 +92,12 @@ export default async function GameDetailPage({
         <div className="flex items-start gap-4 p-6">
           <ScoreBadge score={overall} size="lg" />
           <div className="min-w-0">
-            <h1 className="text-2xl font-extrabold">{displayTitle(game)}</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-extrabold">{displayTitle(game)}</h1>
+              <span className="shrink-0 rounded-full bg-brand px-3 py-1 text-xs font-bold text-white">
+                겜피셜 평점: {overall ?? "정보 없음"}
+              </span>
+            </div>
             <p className="mt-1 text-sm text-text-dim">
               {(game.genres_ko.length ? game.genres_ko : game.genres).join(
                 " · ",
