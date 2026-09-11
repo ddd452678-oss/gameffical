@@ -288,6 +288,11 @@ export async function refreshCatalog(pagesPerPlatform = 120): Promise<{
  * 캐시된 게임을 GRAC(게임물관리위원회) 정보로 보강한다.
  * genres_ko 가 아직 비어있는 게임을 이름으로 조회 → 매칭되면 한국어 장르·등급·
  * 내용정보·배급사(및 한국어 개요)를 채운다. 한 번에 limit 개씩 처리(크론이 반복).
+ *
+ * 시드 타이틀(메이플스토리 등 국내 주요 게임 포함)은 RAWG 인기도(평점 참여자 수)와
+ * 무관하게 항상 먼저 스캔한다 — 안 그러면 일반 스캔이 rawg_ratings_count 상위
+ * 1000개만 훑기 때문에, 글로벌 리뷰 사이트에서 저평가된(참여자 적은) 국내 게임은
+ * 큐에 영영 못 들어와 배급사 정보(=국내/해외 분류 근거)가 채워지지 않는다.
  */
 export async function gracEnrichCached(limit = 150): Promise<{
   ok: true;
@@ -298,21 +303,30 @@ export async function gracEnrichCached(limit = 150): Promise<{
   const admin = getSupabaseAdmin();
   if (!admin) return { ok: true, scanned: 0, matched: 0, updated: 0 };
 
+  const needsEnrich = (g: Game) => g.genres_ko.length === 0 || !g.name_ko;
+
+  const { data: seedData } = await admin
+    .from("games")
+    .select("*")
+    .in("name", SEED_TITLES);
+  const seedGames = (seedData ?? [])
+    .map((r) => rowToGame(r as Record<string, unknown>))
+    .filter(needsEnrich);
+  const seedIds = new Set(seedGames.map((g) => g.id));
+
   const { data, error } = await admin
     .from("games")
     .select("*")
     .order("rawg_ratings_count", { ascending: false })
     .limit(1000);
-  if (error || !data || data.length === 0) {
-    return { ok: true, scanned: 0, matched: 0, updated: 0 };
-  }
+  const generalGames =
+    error || !data
+      ? []
+      : data
+          .map((r) => rowToGame(r as Record<string, unknown>))
+          .filter((g) => !seedIds.has(g.id) && needsEnrich(g));
 
-  const games = data
-    .map((r) => rowToGame(r as Record<string, unknown>))
-    // genres_ko 가 비어있거나(미보강) name_ko 만 아직 없는(name_ko 기능 추가 이전에
-    // 보강된) 게임도 다시 스캔한다.
-    .filter((g) => g.genres_ko.length === 0 || !g.name_ko)
-    .slice(0, limit);
+  const games = [...seedGames, ...generalGames].slice(0, limit);
   if (games.length === 0) {
     return { ok: true, scanned: 0, matched: 0, updated: 0 };
   }
