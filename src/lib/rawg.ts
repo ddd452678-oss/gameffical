@@ -92,44 +92,109 @@ function toGame(item: RawgListItem, detail?: RawgDetail): Game {
   };
 }
 
+export interface FetchPlatformOptions {
+  /** 이어서 조회를 시작할 페이지 (진행 커서). 기본 1. */
+  startPage?: number;
+  /** 이번 호출에서 최대 몇 페이지까지 가져올지. 기본 3. */
+  maxPages?: number;
+  pageSize?: number;
+  /** 동시에 요청할 페이지 수 (RAWG 레이트리밋 고려해 과하게 크게 잡지 않는다). */
+  concurrency?: number;
+}
+
+export interface FetchPlatformResult {
+  games: Game[];
+  /** 다음 호출에서 이어서 조회할 페이지. 끝까지 다 돌았으면 1로 순환한다. */
+  nextPage: number;
+  /** RAWG count 기준 전체 페이지 수 (카탈로그 규모 파악용). */
+  totalPages: number;
+}
+
 /**
- * 플랫폼별 인기 게임 목록. RAWG 키가 없으면 빈 배열을 반환한다(호출부가 샘플로 폴백).
- * pages 만큼 페이지네이션하며 id 기준 중복을 제거한다 (RAWG 한 페이지 최대 40).
+ * 플랫폼별 게임 목록을 페이지 단위로 병렬 조회한다.
+ * RAWG 키가 없으면 빈 결과를 반환한다(호출부가 샘플로 폴백).
+ * startPage/nextPage 를 커버리지 진행 커서로 사용해, 매 호출마다 다른 구간을 가져오면
+ * (games.ts 의 refreshPlatformCatalog 참고) 하루 API 할당량 안에서도 카탈로그를 계속
+ * 넓혀갈 수 있다. 실패한 페이지가 있으면 nextPage 를 그 페이지로 되돌려 다음 호출에서
+ * 재시도한다(건너뛰어 유실되지 않도록).
  */
 export async function fetchGamesByPlatform(
   kind: PlatformKind,
-  pages = 3,
-  pageSize = 40,
-): Promise<Game[]> {
-  if (!hasRawg) return [];
+  opts: FetchPlatformOptions = {},
+): Promise<FetchPlatformResult> {
+  const { startPage = 1, maxPages = 3, pageSize = 40, concurrency = 6 } = opts;
+  if (!hasRawg) return { games: [], nextPage: startPage, totalPages: 0 };
+
+  const buildUrl = (page: number) =>
+    rawgUrl("/games", {
+      parent_platforms: KIND_TO_PARENT_QUERY[kind],
+      ordering: "-added",
+      page_size: pageSize,
+      page,
+    });
+
+  const fetchPage = async (
+    page: number,
+  ): Promise<{ page: number; items: RawgListItem[] | null; count?: number }> => {
+    try {
+      const res = await fetch(buildUrl(page), {
+        next: { revalidate: 60 * 60 * 6 }, // 6시간 캐시 (fetch 레벨)
+      });
+      if (!res.ok) return { page, items: null };
+      const json = (await res.json()) as {
+        results: RawgListItem[];
+        count: number;
+      };
+      return { page, items: json.results, count: json.count };
+    } catch {
+      return { page, items: null };
+    }
+  };
+
+  const first = await fetchPage(startPage);
+  if (first.items === null) {
+    if (startPage === 1) throw new Error("RAWG 목록 조회 실패");
+    // 진행 커서가 끝을 넘어갔거나 일시 오류 — 처음부터 다시 돌도록 커서를 리셋
+    return { games: [], nextPage: 1, totalPages: 0 };
+  }
+
+  const totalPages = Math.max(1, Math.ceil((first.count ?? 0) / pageSize));
   const out: Game[] = [];
   const seen = new Set<number>();
-  for (let page = 1; page <= pages; page++) {
-    const res = await fetch(
-      rawgUrl("/games", {
-        parent_platforms: KIND_TO_PARENT_QUERY[kind],
-        ordering: "-added",
-        page_size: pageSize,
-        page,
-      }),
-      { next: { revalidate: 60 * 60 * 6 } }, // 6시간 캐시 (fetch 레벨)
-    );
-    if (!res.ok) {
-      if (page === 1) throw new Error(`RAWG 목록 조회 실패: ${res.status}`);
-      break;
-    }
-    const json = (await res.json()) as {
-      results: RawgListItem[];
-      next: string | null;
-    };
-    for (const r of json.results) {
+  const addResults = (items: RawgListItem[]) => {
+    for (const r of items) {
       if (seen.has(r.id)) continue;
       seen.add(r.id);
       out.push(toGame(r));
     }
-    if (!json.next) break;
+  };
+  addResults(first.items);
+
+  const pagesToFetch: number[] = [];
+  for (let p = startPage + 1; p < startPage + maxPages && p <= totalPages; p++) {
+    pagesToFetch.push(p);
   }
-  return out;
+
+  let firstFailedPage: number | null = null;
+  for (let i = 0; i < pagesToFetch.length; i += concurrency) {
+    const batch = pagesToFetch.slice(i, i + concurrency);
+    const results = await Promise.all(batch.map(fetchPage));
+    for (const r of results) {
+      if (r.items === null) {
+        if (firstFailedPage === null || r.page < firstFailedPage) {
+          firstFailedPage = r.page;
+        }
+        continue;
+      }
+      addResults(r.items);
+    }
+  }
+
+  const lastAttemptedPage = startPage + pagesToFetch.length;
+  const reachedEnd = lastAttemptedPage >= totalPages && firstFailedPage === null;
+  const nextPage = firstFailedPage ?? (reachedEnd ? 1 : lastAttemptedPage + 1);
+
+  return { games: out, nextPage, totalPages };
 }
 
 /**

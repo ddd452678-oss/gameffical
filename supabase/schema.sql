@@ -49,6 +49,21 @@ create index if not exists games_name_trgm_idx on public.games using gin (name e
 create index if not exists games_name_ko_trgm_idx on public.games using gin (name_ko extensions.gin_trgm_ops);
 
 -- ───────────────────────────────────────────────
+-- 1-1. catalog_progress : 플랫폼별 RAWG 카탈로그 수집 진행 커서
+--    /api/refresh 가 호출될 때마다 이어서 조회할 페이지를 기억해, 하루 API 할당량
+--    안에서도 여러 날에 걸쳐 카탈로그를 계속 넓혀간다 (끝까지 가면 1페이지로 순환).
+-- ───────────────────────────────────────────────
+create table if not exists public.catalog_progress (
+  platform_kind text primary key,        -- 'pc' | 'mobile' | 'console'
+  next_page     int not null default 1,
+  total_pages   int,                     -- RAWG count 기준 전체 페이지 수 (파악되면 기록)
+  updated_at    timestamptz not null default now()
+);
+
+alter table public.catalog_progress enable row level security;
+-- (읽기/쓰기 정책 없음 → service_role 키로만 접근. 클라이언트에는 노출하지 않는다)
+
+-- ───────────────────────────────────────────────
 -- 2. reviews : 100% 자체 생성 유저 리뷰
 -- ───────────────────────────────────────────────
 create table if not exists public.reviews (

@@ -15,7 +15,10 @@ import {
 } from "./sample-games";
 import type { Game, PlatformKind } from "./types";
 
-const PLATFORM_LIST_LIMIT = 150;
+// Supabase(PostgREST) 기본 응답 행 제한과 맞춰 안전하게 잡은 상한.
+// 카탈로그 자체는 refreshPlatformCatalog 가 계속 넓혀가며, 목록 페이지는 이 안에서
+// 페이지네이션한다 ([platform]/page.tsx 참고).
+const PLATFORM_LIST_LIMIT = 1000;
 
 // 카탈로그(이름/이미지/장르 등) 갱신 주기: 7일
 const CATALOG_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -167,7 +170,7 @@ export async function listGamesByPlatform(kind: PlatformKind): Promise<Game[]> {
       .contains("platform_kinds", [kind])
       .gte("metadata_updated_at", freshAfter)
       .order("rawg_ratings_count", { ascending: false })
-      .limit(500);
+      .limit(PLATFORM_LIST_LIMIT);
     if (!error && data && data.length > 0) {
       // 국내 게임(시드/GRAC/국내 배급사)을 앞으로, 그다음 RAWG 인기순
       const games = data.map((r) => rowToGame(r as Record<string, unknown>));
@@ -182,7 +185,8 @@ export async function listGamesByPlatform(kind: PlatformKind): Promise<Game[]> {
 
   try {
     // 캐시 미스 시 즉시 응답용으로는 2페이지만 (깊은 채우기는 refreshCatalog/크론이 담당)
-    const fromRawg = (await fetchGamesByPlatform(kind, 2)).map(withSeedKoName);
+    const { games: fromRawg0 } = await fetchGamesByPlatform(kind, { maxPages: 2 });
+    const fromRawg = fromRawg0.map(withSeedKoName);
     if (fromRawg.length > 0) {
       await cacheGames(fromRawg);
       return fromRawg;
@@ -194,31 +198,87 @@ export async function listGamesByPlatform(kind: PlatformKind): Promise<Game[]> {
   return getSampleGamesByPlatform(kind);
 }
 
+const PLATFORM_KINDS: PlatformKind[] = ["pc", "mobile", "console"];
+
 /**
- * 카탈로그 전체 갱신: 3개 플랫폼 심화 조회 + 국내 게임 시드 타이틀을 한 번에
- * RAWG 에서 가져와 Supabase 에 캐시한다. /api/refresh 라우트와 Vercel 크론이 호출.
+ * 플랫폼 하나를 진행 커서(catalog_progress)부터 이어서 조회한다.
+ * Supabase 가 없으면(로컬 키 없이 개발 등) 커서 없이 매번 1페이지부터 조회한다.
  */
-export async function refreshCatalog(): Promise<{
+async function refreshPlatformCatalog(
+  kind: PlatformKind,
+  maxPages: number,
+): Promise<{ games: Game[]; totalPages: number }> {
+  const admin = getSupabaseAdmin();
+  let startPage = 1;
+  if (admin) {
+    const { data } = await admin
+      .from("catalog_progress")
+      .select("next_page")
+      .eq("platform_kind", kind)
+      .maybeSingle();
+    if (data?.next_page) startPage = data.next_page;
+  }
+
+  const { games, nextPage, totalPages } = await fetchGamesByPlatform(kind, {
+    startPage,
+    maxPages,
+  });
+
+  if (admin) {
+    const { error } = await admin.from("catalog_progress").upsert(
+      {
+        platform_kind: kind,
+        next_page: nextPage,
+        total_pages: totalPages,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "platform_kind" },
+    );
+    if (error) console.error("[games] catalog_progress 저장 실패:", error.message);
+  }
+
+  return { games, totalPages };
+}
+
+/**
+ * 카탈로그 전체 갱신: 3개 플랫폼을 진행 커서 기준으로 이어서 조회 + 국내 게임
+ * 시드 타이틀을 RAWG 에서 가져와 Supabase 에 캐시한다.
+ * /api/refresh 라우트와 Vercel 크론이 호출. 호출마다 플랫폼별 다음 구간을 가져오므로
+ * (RAWG count 를 넘어서면 1페이지로 순환) 매일 실행할수록 카탈로그가 계속 넓어진다.
+ */
+export async function refreshCatalog(pagesPerPlatform = 120): Promise<{
   ok: true;
   platforms: Record<PlatformKind, number>;
+  totalPages: Record<PlatformKind, number>;
   seeded: number;
   cached: number;
 }> {
   const [pc, mobile, console_, seeded] = await Promise.all([
-    fetchGamesByPlatform("pc", 3),
-    fetchGamesByPlatform("mobile", 3),
-    fetchGamesByPlatform("console", 3),
+    refreshPlatformCatalog("pc", pagesPerPlatform),
+    refreshPlatformCatalog("mobile", pagesPerPlatform),
+    refreshPlatformCatalog("console", pagesPerPlatform),
     fetchGamesByTitles(SEED_TITLES),
   ]);
 
   const byId = new Map<number, Game>();
-  for (const g of [...pc, ...mobile, ...console_, ...seeded]) byId.set(g.id, g);
+  for (const g of [...pc.games, ...mobile.games, ...console_.games, ...seeded]) {
+    byId.set(g.id, g);
+  }
   const all = [...byId.values()];
   await cacheGames(all);
 
   return {
     ok: true,
-    platforms: { pc: pc.length, mobile: mobile.length, console: console_.length },
+    platforms: {
+      pc: pc.games.length,
+      mobile: mobile.games.length,
+      console: console_.games.length,
+    },
+    totalPages: {
+      pc: pc.totalPages,
+      mobile: mobile.totalPages,
+      console: console_.totalPages,
+    },
     seeded: seeded.length,
     cached: all.length,
   };
@@ -474,11 +534,7 @@ export async function searchGamesByName(query: string): Promise<Game[]> {
 export async function listGamesByRegion(
   region: "domestic" | "overseas",
 ): Promise<Game[]> {
-  const featured = await Promise.all([
-    listGamesByPlatform("pc"),
-    listGamesByPlatform("mobile"),
-    listGamesByPlatform("console"),
-  ]);
+  const featured = await Promise.all(PLATFORM_KINDS.map(listGamesByPlatform));
   const byId = new Map<number, Game>();
   for (const g of featured.flat()) byId.set(g.id, g);
   const filtered = [...byId.values()].filter(
