@@ -7,6 +7,8 @@ import { ReviewForm } from "@/components/ReviewForm";
 import { ReviewList, ReviewStatsCard } from "@/components/ReviewList";
 import { getGame } from "@/lib/games";
 import { getReviewStats, listReviews } from "@/lib/reviews";
+import { getSupabaseServer } from "@/lib/supabase/server";
+import { getDisplayName } from "@/lib/display-name";
 import {
   computeOverallScore,
   displayTitle,
@@ -14,7 +16,8 @@ import {
   type Game,
 } from "@/lib/types";
 
-export const revalidate = 1800;
+// 로그인 상태(쿠키)를 읽어 개인화하기 때문에 요청마다 새로 렌더링된다
+// (cookies() 사용 시 Next.js 가 자동으로 동적 렌더링으로 전환).
 
 export async function generateMetadata({
   params,
@@ -65,11 +68,22 @@ export default async function GameDetailPage({
   if (!game) notFound();
 
   const overall = computeOverallScore(game);
-  const [reviews, stats] = await Promise.all([
+  const [reviews, stats, supabaseServer] = await Promise.all([
     listReviews(game.id),
     getReviewStats(game.id),
+    getSupabaseServer(),
   ]);
   const storeLinks = buildStoreLinks(game);
+
+  const authUser = supabaseServer
+    ? (await supabaseServer.auth.getUser()).data.user
+    : null;
+  const currentUser = authUser
+    ? { id: authUser.id, displayName: getDisplayName(authUser) }
+    : null;
+  const myReview = currentUser
+    ? (reviews.find((r) => r.user_id === currentUser.id) ?? null)
+    : null;
 
   return (
     <div>
@@ -222,14 +236,18 @@ export default async function GameDetailPage({
                 ({reviews.length})
               </span>
             </h2>
-            <ReviewList reviews={reviews} />
+            <ReviewList reviews={reviews} currentUserId={currentUser?.id} />
           </section>
         </div>
 
         {/* 사이드바 */}
         <aside className="space-y-4 lg:sticky lg:top-20 self-start">
           <ReviewStatsCard stats={stats} />
-          <ReviewForm gameId={game.id} />
+          <ReviewForm
+            gameId={game.id}
+            currentUser={currentUser}
+            initialReview={myReview}
+          />
         </aside>
       </div>
     </div>

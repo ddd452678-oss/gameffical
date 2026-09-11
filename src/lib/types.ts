@@ -40,12 +40,14 @@ export interface Game {
 export interface Review {
   id: string;
   game_id: number;
+  user_id: string; // 작성자 계정 (로그인 필수 — 카카오/구글/이메일)
   author_name: string;
   fun_rating: number;
   cost_burden: number;
   gacha_transparency: number | null;
   body: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface ReviewInput {

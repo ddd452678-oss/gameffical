@@ -57,7 +57,13 @@ export function ReviewStatsCard({ stats }: { stats: ReviewStats }) {
   );
 }
 
-export function ReviewList({ reviews }: { reviews: Review[] }) {
+export function ReviewList({
+  reviews,
+  currentUserId,
+}: {
+  reviews: Review[];
+  currentUserId?: string;
+}) {
   if (reviews.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-border py-10 text-center text-sm text-text-dim">
@@ -70,7 +76,14 @@ export function ReviewList({ reviews }: { reviews: Review[] }) {
       {reviews.map((r) => (
         <li key={r.id} className="rounded-2xl bg-surface p-5 shadow-card">
           <div className="flex items-center justify-between">
-            <span className="font-medium text-sm">{r.author_name}</span>
+            <span className="flex items-center gap-1.5 text-sm font-medium">
+              {r.author_name}
+              {r.user_id === currentUserId && (
+                <span className="rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold text-brand">
+                  내 리뷰
+                </span>
+              )}
+            </span>
             <span className="text-xs text-text-dim">{fmtDate(r.created_at)}</span>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">

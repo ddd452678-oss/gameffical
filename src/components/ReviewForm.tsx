@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { COST_BURDEN_LABELS, GACHA_LABELS } from "./ReviewList";
+import type { Review } from "@/lib/types";
 
 function StarPicker({
   value,
@@ -64,17 +66,54 @@ function ScalePicker({
   );
 }
 
-export function ReviewForm({ gameId }: { gameId: number }) {
+/** 로그인하지 않은 방문자에게 보여주는 안내 카드. */
+function LoginPrompt({ gameId }: { gameId: number }) {
+  return (
+    <div className="space-y-3 rounded-2xl bg-surface p-5 text-center shadow-card">
+      <h3 className="text-[15px] font-extrabold">리뷰 작성</h3>
+      <p className="text-sm text-text-dim">
+        리뷰는 로그인한 계정으로만 남길 수 있어요.
+        <br />
+        카카오·구글·이메일로 간단하게 로그인해 주세요.
+      </p>
+      <Link
+        href={`/login?next=${encodeURIComponent(`/game/${gameId}`)}`}
+        className="inline-block h-11 w-full rounded-xl bg-brand px-4 py-2.5 text-sm font-bold leading-6 text-white transition-colors hover:bg-brand-dim"
+      >
+        로그인하고 리뷰 남기기
+      </Link>
+    </div>
+  );
+}
+
+export function ReviewForm({
+  gameId,
+  currentUser,
+  initialReview,
+}: {
+  gameId: number;
+  currentUser: { id: string; displayName: string } | null;
+  initialReview: Review | null;
+}) {
   const router = useRouter();
-  const [authorName, setAuthorName] = useState("");
-  const [fun, setFun] = useState(0);
-  const [cost, setCost] = useState(0);
-  const [gacha, setGacha] = useState(0);
-  const [gachaNA, setGachaNA] = useState(false);
-  const [body, setBody] = useState("");
+  const isEdit = !!initialReview;
+
+  const [authorName, setAuthorName] = useState(
+    initialReview?.author_name ?? currentUser?.displayName ?? "",
+  );
+  const [fun, setFun] = useState(initialReview?.fun_rating ?? 0);
+  const [cost, setCost] = useState(initialReview?.cost_burden ?? 0);
+  const [gacha, setGacha] = useState(initialReview?.gacha_transparency ?? 0);
+  const [gachaNA, setGachaNA] = useState(
+    initialReview ? initialReview.gacha_transparency == null : false,
+  );
+  const [body, setBody] = useState(initialReview?.body ?? "");
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+
+  if (!currentUser) return <LoginPrompt gameId={gameId} />;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -89,9 +128,10 @@ export function ReviewForm({ gameId }: { gameId: number }) {
     setSubmitting(true);
     try {
       const res = await fetch("/api/reviews", {
-        method: "POST",
+        method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: initialReview?.id,
           game_id: gameId,
           author_name: authorName,
           fun_rating: fun,
@@ -106,11 +146,6 @@ export function ReviewForm({ gameId }: { gameId: number }) {
         return;
       }
       setDone(true);
-      setBody("");
-      setFun(0);
-      setCost(0);
-      setGacha(0);
-      setGachaNA(false);
       router.refresh();
     } catch {
       setError("네트워크 오류가 발생했습니다.");
@@ -119,26 +154,64 @@ export function ReviewForm({ gameId }: { gameId: number }) {
     }
   }
 
+  async function handleDelete() {
+    if (!initialReview) return;
+    if (!window.confirm("리뷰를 삭제할까요? 되돌릴 수 없어요.")) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: initialReview.id }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setError(json.error ?? "삭제에 실패했습니다.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <form
       onSubmit={handleSubmit}
       className="space-y-4 rounded-2xl bg-surface p-5 shadow-card"
     >
-      <h3 className="text-[15px] font-extrabold">리뷰 작성</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-[15px] font-extrabold">
+          {isEdit ? "내 리뷰 수정" : "리뷰 작성"}
+        </h3>
+        {isEdit && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="text-xs font-semibold text-[#d84343] hover:underline disabled:opacity-50"
+          >
+            {deleting ? "삭제 중…" : "삭제"}
+          </button>
+        )}
+      </div>
 
       {done && (
         <p className="rounded-xl bg-[#e7f4ee] px-3 py-2.5 text-sm font-medium text-[#188652]">
-          리뷰가 등록되었습니다. 감사합니다!
+          {isEdit ? "리뷰가 수정되었습니다." : "리뷰가 등록되었습니다. 감사합니다!"}
         </p>
       )}
 
       <div>
-        <label className="text-sm text-text-dim">닉네임 (선택)</label>
+        <label className="text-sm text-text-dim">닉네임</label>
         <input
           value={authorName}
           onChange={(e) => setAuthorName(e.target.value)}
           maxLength={20}
-          placeholder="익명"
+          placeholder={currentUser.displayName}
           className="mt-1.5 h-11 w-full rounded-xl bg-surface-2 px-3.5 text-sm outline-none ring-1 ring-transparent transition focus:bg-surface focus:ring-brand"
         />
       </div>
@@ -205,7 +278,7 @@ export function ReviewForm({ gameId }: { gameId: number }) {
         disabled={submitting}
         className="h-12 w-full rounded-xl bg-brand text-sm font-bold text-white transition-colors hover:bg-brand-dim disabled:opacity-50"
       >
-        {submitting ? "등록 중…" : "리뷰 등록"}
+        {submitting ? "저장 중…" : isEdit ? "수정 완료" : "리뷰 등록"}
       </button>
     </form>
   );

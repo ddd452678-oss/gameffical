@@ -65,10 +65,13 @@ alter table public.catalog_progress enable row level security;
 
 -- ───────────────────────────────────────────────
 -- 2. reviews : 100% 자체 생성 유저 리뷰
+--    로그인(카카오/구글/이메일)한 계정만 작성 가능, 게임당 1인 1리뷰.
+--    둘러보기(읽기)는 로그인 없이 누구나 가능.
 -- ───────────────────────────────────────────────
 create table if not exists public.reviews (
   id                 uuid primary key default gen_random_uuid(),
   game_id            bigint not null references public.games(id) on delete cascade,
+  user_id            uuid not null references auth.users(id) on delete cascade,
   author_name        text not null default '익명',
   -- 재미/완성도 별점 (1~5)
   fun_rating         smallint not null check (fun_rating between 1 and 5),
@@ -77,7 +80,9 @@ create table if not exists public.reviews (
   -- 확률형 아이템 체감 투명성 (1 = 매우 불투명, 5 = 매우 투명 / 해당 없으면 null)
   gacha_transparency smallint check (gacha_transparency between 1 and 5),
   body               text not null check (char_length(body) between 5 and 5000),
-  created_at         timestamptz not null default now()
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now(),
+  unique (game_id, user_id) -- 게임당 1인 1리뷰
 );
 
 create index if not exists reviews_game_id_created_idx on public.reviews (game_id, created_at desc);
@@ -97,8 +102,10 @@ group by game_id;
 
 -- ───────────────────────────────────────────────
 -- 4. RLS (Row Level Security)
---    - games : 누구나 읽기 가능 / 쓰기는 service_role(서버)만
---    - reviews : 누구나 읽기 + 누구나 작성 가능 (MVP, 로그인 없음)
+--    - games   : 누구나 읽기 가능 / 쓰기는 service_role(서버)만
+--    - reviews : 누구나 읽기 가능 / 쓰기(작성·수정·삭제)는 로그인한 본인 리뷰만
+--      (서버는 실제로는 service_role 키로 우회해서 쓰지만, anon 키가 유출되거나
+--       누가 브라우저에서 직접 Supabase 를 호출해도 막히도록 정책은 정확히 잡아둔다)
 -- ───────────────────────────────────────────────
 alter table public.games   enable row level security;
 alter table public.reviews enable row level security;
@@ -114,8 +121,23 @@ create policy "reviews are public readable"
   using (true);
 
 drop policy if exists "anyone can insert a review" on public.reviews;
-create policy "anyone can insert a review"
+drop policy if exists "authenticated users can insert own review" on public.reviews;
+create policy "authenticated users can insert own review"
   on public.reviews for insert
-  with check (true);
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "users can update own review" on public.reviews;
+create policy "users can update own review"
+  on public.reviews for update
+  to authenticated
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "users can delete own review" on public.reviews;
+create policy "users can delete own review"
+  on public.reviews for delete
+  to authenticated
+  using (auth.uid() = user_id);
 
 -- (games 에 대한 insert/update 정책은 만들지 않음 → service_role 키만 우회 가능)
