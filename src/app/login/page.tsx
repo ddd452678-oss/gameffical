@@ -109,7 +109,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="mx-auto max-w-sm">
+    <div className="mx-auto max-w-sm rounded-2xl bg-surface p-6 shadow-card">
       <h1 className="text-2xl font-extrabold">
         {mode === "signin" ? "로그인" : "회원가입"}
       </h1>
@@ -120,11 +120,13 @@ function LoginForm() {
       <div className="mt-6 space-y-2.5">
         <button
           type="button"
-          onClick={() => handleOAuth("kakao")}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] text-sm font-bold text-[#191600] transition-opacity hover:opacity-90"
+          disabled
+          title="카카오 로그인은 준비 중입니다."
+          className="flex h-12 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-[#FEE500] text-sm font-bold text-[#191600] opacity-50"
         >
           <KakaoIcon />
-          카카오로 계속하기
+          카카오 로그인
+          <span className="text-xs font-semibold">(준비중)</span>
         </button>
         <button
           type="button"
@@ -132,7 +134,7 @@ function LoginForm() {
           className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface text-sm font-bold transition-colors hover:bg-surface-2"
         >
           <GoogleIcon />
-          구글로 계속하기
+          구글 로그인
         </button>
       </div>
 
