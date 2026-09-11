@@ -108,11 +108,23 @@ function titleCandidates(gametitle: string): string[] {
 }
 
 /**
+ * 접두어 매칭에서, 긴 쪽이 짧은 쪽 뒤에 숫자만 덧붙은 형태인지 확인한다
+ * (예: "psychonauts" vs "psychonauts2"). 이런 경우 시리즈 후속작(속편)일
+ * 가능성이 높아 같은 게임으로 보면 안 된다 — 실제로 "Psychonauts" 검색이
+ * "Psychonauts 2" GRAC 항목에 매칭되는 오탐이 있었다.
+ */
+function isSequelNumberSuffix(a: string, b: string): boolean {
+  const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
+  return /^\d+$/.test(longer.slice(shorter.length));
+}
+
+/**
  * 검색어와 가장 잘 맞는 GRAC 항목을 고른다. 확신이 낮으면 null.
  * GRAC 검색은 제목 문자열(한/영)에 민감해서 오매칭 방지를 위해 보수적으로 잡는다:
  * - 정규화 완전일치(100) 또는
  * - 한쪽이 다른 쪽의 접두사이고 길이비가 0.55 이상(75)
  * 인 경우만 인정. 단순 부분포함은 제외 (예: "테라" → "테라리움").
+ * 단, 접두사 뒤에 숫자만 붙어 갈리는 경우(속편 번호)는 매칭에서 제외한다.
  */
 export function pickGracMatch(
   query: string,
@@ -133,7 +145,10 @@ export function pickGracMatch(
       if (nc.length < 2) continue;
       if (nc === nq) {
         score = Math.max(score, 100);
-      } else if (nc.startsWith(nq) || nq.startsWith(nc)) {
+      } else if (
+        (nc.startsWith(nq) || nq.startsWith(nc)) &&
+        !isSequelNumberSuffix(nc, nq)
+      ) {
         const ratio =
           Math.min(nc.length, nq.length) / Math.max(nc.length, nq.length);
         if (ratio >= 0.7) score = Math.max(score, 78);
