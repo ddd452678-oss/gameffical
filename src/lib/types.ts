@@ -72,6 +72,27 @@ export function displayTitle(game: Game): string {
   return game.name_ko ? `${game.name_ko} | ${game.name}` : game.name;
 }
 
+const MOBILE_PLATFORM_NAMES = new Set(["iOS", "Android"]);
+
+/**
+ * 모바일이 "주" 플랫폼인 게임인지 판별한다. platform_kinds 에 mobile 이
+ * 포함돼 있어도, PC/콘솔 게임에 예전 모바일 포트가 하나 끼어있는 경우
+ * (예: Psychonauts 의 2011년 iPad판)까지 모바일 카테고리에 넣지 않기 위함.
+ *
+ * raw_platforms 중 모바일(iOS/Android) 비중이 1/3 이상이면 모바일 주력으로 본다.
+ * 절반 기준이 아니라 1/3 로 완화한 이유: 원신처럼 모바일 우선으로 기획된
+ * 라이브서비스 게임도 PS4/PS5/Switch 등 콘솔 버전이 여러 개라 플랫폼 개수 자체가
+ * 많아지는데, 절반 기준이면 이런 게임까지 걸러져 버린다.
+ */
+export function isPrimaryMobile(game: Game): boolean {
+  if (!game.platform_kinds.includes("mobile")) return false;
+  const mobileCount = game.raw_platforms.filter((p) =>
+    MOBILE_PLATFORM_NAMES.has(p),
+  ).length;
+  if (mobileCount === 0) return false;
+  return game.raw_platforms.length <= mobileCount * 3;
+}
+
 /**
  * 종합 평점(0~100). 공식 데이터가 있으면 가중 평균해서 계산한다.
  * - metacritic (0~100)          가중치 0.5

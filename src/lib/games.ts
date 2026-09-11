@@ -13,7 +13,7 @@ import {
   getSampleGamesByPlatform,
   SAMPLE_GAMES,
 } from "./sample-games";
-import type { Game, PlatformKind } from "./types";
+import { isPrimaryMobile, type Game, type PlatformKind } from "./types";
 
 // Supabase(PostgREST) 기본 응답 행 제한과 맞춰 안전하게 잡은 상한.
 // 카탈로그 자체는 refreshPlatformCatalog 가 계속 넓혀가며, 목록 페이지는 이 안에서
@@ -154,12 +154,22 @@ async function cacheGames(games: Game[]): Promise<void> {
 }
 
 /**
- * 플랫폼별 게임 목록.
+ * 플랫폼별 게임 목록. 모바일은 모바일이 "주" 플랫폼인 게임만 보여준다 —
+ * PC/콘솔 게임인데 예전에 모바일 포트가 하나 있었던 것만으로 모바일
+ * 카테고리에 뜨는 것을 방지한다 (isPrimaryMobile 참고).
+ */
+export async function listGamesByPlatform(kind: PlatformKind): Promise<Game[]> {
+  const games = await listGamesByPlatformRaw(kind);
+  return kind === "mobile" ? games.filter(isPrimaryMobile) : games;
+}
+
+/**
+ * 위 함수의 실제 조회 로직.
  * 1) Supabase 캐시에 유효한 데이터가 있으면 사용
  * 2) 없으면 RAWG 에서 가져와 캐시에 저장
  * 3) RAWG 키도 없으면 샘플 데이터
  */
-export async function listGamesByPlatform(kind: PlatformKind): Promise<Game[]> {
+async function listGamesByPlatformRaw(kind: PlatformKind): Promise<Game[]> {
   const supabase = getSupabase();
 
   if (supabase) {
