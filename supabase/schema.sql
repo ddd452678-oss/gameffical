@@ -141,3 +141,60 @@ create policy "users can delete own review"
   using (auth.uid() = user_id);
 
 -- (games 에 대한 insert/update 정책은 만들지 않음 → service_role 키만 우회 가능)
+
+-- ───────────────────────────────────────────────
+-- 5. profiles : 로그인 아이디(username) ↔ 계정 매핑
+--    이메일 로그인 계정은 "아이디"를 직접 정해서 가입한다(이메일은 비밀번호
+--    찾기/아이디 찾기 연락용으로만 보관). 카카오/구글 로그인 계정은 username
+--    이 없다(해당 없음) — OAuth 로 로그인하니 아이디/비번 개념이 필요 없다.
+--
+--    email 컬럼은 여기(관리자 API 전용 조회)에만 두고, RLS 로 본인 것만
+--    읽을 수 있게 잠근다 — 이메일 주소가 공개로 긁히지 않도록.
+--    아이디 중복 확인(회원가입 시)은 이메일이 없는 별도의 공개 뷰(usernames)로만 노출한다.
+-- ───────────────────────────────────────────────
+create table if not exists public.profiles (
+  user_id    uuid primary key references auth.users(id) on delete cascade,
+  username   text,
+  email      text,
+  created_at timestamptz not null default now(),
+  constraint profiles_username_format
+    check (username is null or username ~ '^[a-zA-Z0-9_]{4,20}$')
+);
+
+create unique index if not exists profiles_username_uidx
+  on public.profiles (username) where username is not null;
+
+alter table public.profiles enable row level security;
+
+drop policy if exists "users can read own profile" on public.profiles;
+create policy "users can read own profile"
+  on public.profiles for select
+  to authenticated
+  using (auth.uid() = user_id);
+-- (insert/update 정책 없음 → 아래 트리거(security definer)와 service_role API 만 씀)
+
+-- 회원가입 시 아이디 중복 확인용 — 이메일 없이 username 만 공개 노출
+create or replace view public.usernames as
+  select username from public.profiles where username is not null;
+grant select on public.usernames to anon, authenticated;
+
+-- auth.users 에 새 계정이 생기면 자동으로 profiles 행을 만든다.
+-- (이메일 인증 대기 상태에서도 즉시 실행되므로, signUp() 시점에 넘긴
+--  raw_user_meta_data.username 을 바로 저장할 수 있다)
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.profiles (user_id, username, email)
+  values (new.id, new.raw_user_meta_data->>'username', new.email)
+  on conflict (user_id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();

@@ -1,9 +1,12 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
 import { sanitizeNextPath } from "@/lib/safe-redirect";
+
+const USERNAME_RE = /^[a-zA-Z0-9_]{4,20}$/;
 
 function KakaoIcon() {
   return (
@@ -45,6 +48,7 @@ function LoginForm() {
   const next = sanitizeNextPath(searchParams.get("next"));
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -71,41 +75,92 @@ function LoginForm() {
     if (error) setError(error.message);
   }
 
-  async function handleEmailSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function switchMode(next: "signin" | "signup") {
+    setMode(next);
     setError(null);
     setNotice(null);
-    if (!email || !password) {
-      setError("이메일과 비밀번호를 입력해 주세요.");
+  }
+
+  async function handleSignIn() {
+    if (!username || !password) {
+      setError("아이디와 비밀번호를 입력해 주세요.");
       return;
     }
     setBusy(true);
     try {
-      if (mode === "signup") {
-        const { error } = await supabase!.auth.signUp({ email, password });
-        if (error) {
-          setError(error.message);
-          return;
-        }
-        setNotice(
-          "가입 확인 메일을 보냈습니다. 메일함을 확인해 링크를 눌러주세요. (메일이 안 보이면 스팸함도 확인)",
-        );
-      } else {
-        const { error } = await supabase!.auth.signInWithPassword({ email, password });
-        if (error) {
-          setError(
-            error.message.includes("Invalid login")
-              ? "이메일 또는 비밀번호가 올바르지 않습니다."
-              : error.message,
-          );
-          return;
-        }
-        router.replace(next);
-        router.refresh();
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setError(json.error ?? "로그인에 실패했습니다.");
+        return;
       }
+      router.replace(next);
+      router.refresh();
+    } catch {
+      setError("네트워크 오류가 발생했습니다.");
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleSignUp() {
+    if (!USERNAME_RE.test(username)) {
+      setError("아이디는 영문/숫자/밑줄(_)로 4~20자여야 해요.");
+      return;
+    }
+    if (!email) {
+      setError("이메일을 입력해 주세요.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("비밀번호는 6자 이상이어야 해요.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { data: existing } = await supabase!
+        .from("usernames")
+        .select("username")
+        .eq("username", username)
+        .maybeSingle();
+      if (existing) {
+        setError("이미 사용 중인 아이디예요.");
+        return;
+      }
+
+      const { error } = await supabase!.auth.signUp({
+        email,
+        password,
+        options: { data: { username } },
+      });
+      if (error) {
+        setError(
+          error.message.includes("already registered")
+            ? "이미 가입된 이메일이에요."
+            : error.message,
+        );
+        return;
+      }
+      setNotice(
+        "가입 확인 메일을 보냈습니다. 메일함을 확인해 링크를 눌러주세요. (메일이 안 보이면 스팸함도 확인)",
+      );
+    } catch {
+      setError("네트워크 오류가 발생했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+    if (mode === "signin") await handleSignIn();
+    else await handleSignUp();
   }
 
   return (
@@ -140,19 +195,28 @@ function LoginForm() {
 
       <div className="my-5 flex items-center gap-3 text-xs text-text-dim">
         <div className="h-px flex-1 bg-border" />
-        또는 이메일로 {mode === "signin" ? "로그인" : "가입"}
+        또는 아이디로 {mode === "signin" ? "로그인" : "가입"}
         <div className="h-px flex-1 bg-border" />
       </div>
 
-      <form onSubmit={handleEmailSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-3">
         <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="이메일"
-          autoComplete="email"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="아이디"
+          autoComplete="username"
           className="h-11 w-full rounded-xl bg-surface-2 px-3.5 text-sm outline-none ring-1 ring-transparent transition focus:bg-surface focus:ring-brand"
         />
+        {mode === "signup" && (
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="이메일 (비밀번호 찾기·아이디 찾기용)"
+            autoComplete="email"
+            className="h-11 w-full rounded-xl bg-surface-2 px-3.5 text-sm outline-none ring-1 ring-transparent transition focus:bg-surface focus:ring-brand"
+          />
+        )}
         <input
           type="password"
           value={password}
@@ -178,21 +242,37 @@ function LoginForm() {
           disabled={busy}
           className="h-12 w-full rounded-xl bg-brand text-sm font-bold text-white transition-colors hover:bg-brand-dim disabled:opacity-50"
         >
-          {busy ? "처리 중…" : mode === "signin" ? "이메일로 로그인" : "이메일로 회원가입"}
+          {busy ? "처리 중…" : mode === "signin" ? "로그인" : "회원가입"}
         </button>
       </form>
 
-      <button
-        type="button"
-        onClick={() => {
-          setMode(mode === "signin" ? "signup" : "signin");
-          setError(null);
-          setNotice(null);
-        }}
-        className="mt-4 w-full text-center text-sm font-semibold text-brand hover:underline"
-      >
-        {mode === "signin" ? "계정이 없으신가요? 회원가입" : "이미 계정이 있으신가요? 로그인"}
-      </button>
+      {mode === "signin" ? (
+        <div className="mt-4 flex items-center justify-center gap-2 text-sm">
+          <Link href="/find-username" className="font-semibold text-text-dim hover:underline">
+            아이디 찾기
+          </Link>
+          <span className="text-border">|</span>
+          <Link href="/find-password" className="font-semibold text-text-dim hover:underline">
+            비밀번호 찾기
+          </Link>
+          <span className="text-border">|</span>
+          <button
+            type="button"
+            onClick={() => switchMode("signup")}
+            className="font-semibold text-brand hover:underline"
+          >
+            회원가입
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => switchMode("signin")}
+          className="mt-4 w-full text-center text-sm font-semibold text-brand hover:underline"
+        >
+          이미 계정이 있으신가요? 로그인
+        </button>
+      )}
     </div>
   );
 }
