@@ -135,7 +135,13 @@ function LoginForm() {
       const { error } = await supabase!.auth.signUp({
         email,
         password,
-        options: { data: { username } },
+        options: {
+          data: { username },
+          // Supabase 프로젝트의 Site URL 설정과 무관하게, 확인 메일 링크가
+          // 항상 우리 콜백(/auth/callback)을 거쳐 지금 접속한 도메인으로
+          // 돌아오도록 명시한다.
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/")}`,
+        },
       });
       if (error) {
         setError(
