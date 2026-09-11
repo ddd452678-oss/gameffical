@@ -82,9 +82,13 @@ function extractSteamAppId(game: Game): string | null {
   return null;
 }
 
-/** DB row → Game 도메인 객체 */
+/**
+ * DB row → Game 도메인 객체.
+ * name_ko 가 DB 에 아직 캐시되지 않은 기존 행(마이그레이션 이전에 저장된 게임)도
+ * 있으므로, 매번 시드 목록 폴백을 적용해 즉시 한글명이 보이도록 한다.
+ */
 function rowToGame(row: Record<string, unknown>): Game {
-  return {
+  return withSeedKoName({
     id: Number(row.id),
     slug: String(row.slug),
     name: String(row.name),
@@ -107,7 +111,7 @@ function rowToGame(row: Record<string, unknown>): Game {
     content_descriptors: (row.content_descriptors as string[]) ?? [],
     publisher: (row.publisher as string) ?? null,
     source: (row.source as string) ?? "rawg",
-  };
+  });
 }
 
 function gameToRow(game: Game) {
@@ -245,7 +249,9 @@ export async function gracEnrichCached(limit = 150): Promise<{
 
   const games = data
     .map((r) => rowToGame(r as Record<string, unknown>))
-    .filter((g) => g.genres_ko.length === 0)
+    // genres_ko 가 비어있거나(미보강) name_ko 만 아직 없는(name_ko 기능 추가 이전에
+    // 보강된) 게임도 다시 스캔한다.
+    .filter((g) => g.genres_ko.length === 0 || !g.name_ko)
     .slice(0, limit);
   if (games.length === 0) {
     return { ok: true, scanned: 0, matched: 0, updated: 0 };
