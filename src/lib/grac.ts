@@ -162,13 +162,18 @@ export function gracPlatformKind(platform: string): PlatformKind | null {
 }
 
 /**
- * GRAC gametitle 은 보통 "한글명(English name)" 형태다. 괄호 앞부분을 한글명
- * 후보로 뽑아, 실제로 한글이 포함된 경우에만 반환한다.
+ * GRAC gametitle 은 보통 "English name(한글명)" 형태다(예: "Elden Ring(엘든 링)").
+ * 괄호 안/밖 두 후보 중 한글이 포함된 쪽을 한글명으로 뽑는다 — 표기가 뒤바뀐
+ * 항목도 있을 수 있어 순서를 가정하지 않고 둘 다 확인한다.
  */
 function extractKoreanTitle(gametitle: string): string | null {
   const parenAt = gametitle.lastIndexOf("(");
-  const base = (parenAt > 0 ? gametitle.slice(0, parenAt) : gametitle).trim();
-  return /[가-힣]/.test(base) ? base : null;
+  const paren = gametitle.match(/\(([^)]+)\)\s*$/);
+  const before = (parenAt > 0 ? gametitle.slice(0, parenAt) : gametitle).trim();
+  const inside = paren ? paren[1].trim() : null;
+  if (inside && /[가-힣]/.test(inside)) return inside;
+  if (/[가-힣]/.test(before)) return before;
+  return null;
 }
 
 /** GRAC 항목으로 기존 Game 을 보강한 새 객체를 반환한다. */
