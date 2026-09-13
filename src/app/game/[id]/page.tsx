@@ -9,6 +9,7 @@ import { getGame } from "@/lib/games";
 import { getReviewStats, listReviews } from "@/lib/reviews";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getDisplayName } from "@/lib/display-name";
+import { isDiscontinued } from "@/lib/seed-titles";
 import {
   computeOverallScore,
   displayTitle,
@@ -111,6 +112,11 @@ export default async function GameDetailPage({
               <span className="shrink-0 rounded-full bg-brand px-3 py-1 text-xs font-bold text-white">
                 겜피셜 평점: {overall ?? "정보 없음"}
               </span>
+              {isDiscontinued(game.name) && (
+                <span className="shrink-0 rounded-full bg-surface-2 px-3 py-1 text-xs font-bold text-text-dim">
+                  서비스 종료
+                </span>
+              )}
             </div>
             <p className="mt-1 text-sm text-text-dim">
               {(game.genres_ko.length ? game.genres_ko : game.genres).join(

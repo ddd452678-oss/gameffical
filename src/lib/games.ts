@@ -7,7 +7,13 @@ import {
 } from "./rawg";
 import { enrichSteamRatings, fetchSteamKoreanDescription } from "./steam";
 import { applyGrac, pickGracMatch, searchGrac, type GracItem } from "./grac";
-import { SEED_GAMES, SEED_KO_BY_EN, SEED_TITLES } from "./seed-titles";
+import {
+  isDiscontinued,
+  SEED_GAMES,
+  SEED_KO_BY_EN,
+  SEED_OFFICIAL_URL_BY_EN,
+  SEED_TITLES,
+} from "./seed-titles";
 import {
   getSampleGame,
   getSampleGamesByPlatform,
@@ -52,11 +58,24 @@ function normKey(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-/** 한글 이름이 비어있으면 시드 목록의 한글명으로 채운다 (GRAC 매칭값이 우선). */
+/**
+ * 시드 목록 기반 보강: 한글 이름이 비어있으면 채우고(GRAC 매칭값이 우선),
+ * 구매/설치 링크(stores)가 하나도 없으면(RAWG 에 없는 자체 런처 서비스 등)
+ * 확인된 공식 홈페이지로 채운다.
+ */
 function withSeedKoName(game: Game): Game {
-  if (game.name_ko) return game;
-  const ko = SEED_KO_BY_EN[normKey(game.name)];
-  return ko ? { ...game, name_ko: ko } : game;
+  let g = game;
+  if (!g.name_ko) {
+    const ko = SEED_KO_BY_EN[normKey(g.name)];
+    if (ko) g = { ...g, name_ko: ko };
+  }
+  if (g.stores.length === 0) {
+    const officialUrl = SEED_OFFICIAL_URL_BY_EN[normKey(g.name)];
+    if (officialUrl) {
+      g = { ...g, stores: [{ store: "공식 홈페이지", url: officialUrl }] };
+    }
+  }
+  return g;
 }
 
 /**
@@ -159,7 +178,9 @@ async function cacheGames(games: Game[]): Promise<void> {
  * 카테고리에 뜨는 것을 방지한다 (isPrimaryMobile 참고).
  */
 export async function listGamesByPlatform(kind: PlatformKind): Promise<Game[]> {
-  const games = await listGamesByPlatformRaw(kind);
+  const games = (await listGamesByPlatformRaw(kind)).filter(
+    (g) => !isDiscontinued(g.name),
+  );
   return kind === "mobile" ? games.filter(isPrimaryMobile) : games;
 }
 
@@ -526,6 +547,7 @@ export async function searchGamesByName(query: string): Promise<Game[]> {
     }
     if (byId.size > 0) {
       return [...byId.values()]
+        .filter((g) => !isDiscontinued(g.name))
         .sort((a, b) => b.rawg_ratings_count - a.rawg_ratings_count)
         .slice(0, 24);
     }
@@ -534,7 +556,9 @@ export async function searchGamesByName(query: string): Promise<Game[]> {
   try {
     // 한글 검색어가 시드 목록에 매칭되면 그 영문명으로 RAWG 검색
     const rawgQuery = seedEnMatches[0] ?? q;
-    const results = (await searchGames(rawgQuery)).map(withSeedKoName);
+    const results = (await searchGames(rawgQuery))
+      .map(withSeedKoName)
+      .filter((g) => !isDiscontinued(g.name));
     if (results.length > 0) {
       await cacheGames(results);
       return results;
@@ -546,8 +570,9 @@ export async function searchGamesByName(query: string): Promise<Game[]> {
   const lower = q.toLowerCase();
   return SAMPLE_GAMES.filter(
     (g) =>
-      g.name.toLowerCase().includes(lower) ||
-      (g.name_ko && g.name_ko.includes(q)),
+      !isDiscontinued(g.name) &&
+      (g.name.toLowerCase().includes(lower) ||
+        (g.name_ko && g.name_ko.includes(q))),
   );
 }
 

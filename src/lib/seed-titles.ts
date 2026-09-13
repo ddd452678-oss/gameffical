@@ -2,40 +2,47 @@
  * 카탈로그에 반드시 포함하고 싶은 게임 타이틀.
  * en: RAWG 검색용 (RAWG 는 영문 제목 기준)
  * ko: GRAC 검색용 (게임물관리위원회는 한글 제목 기준)
+ * officialUrl: RAWG 에 스토어 링크가 없는 국내 게임(자체 런처 서비스 등)의
+ *   공식 홈페이지 — 직접 검색으로 확인된 것만 채운다(추측 금지, 틀린 링크가
+ *   더 나쁘다). games.ts 에서 stores 가 비어있을 때만 이 링크로 보강한다.
  * RAWG/GRAC 공식 데이터에 존재하는 항목만 실제로 편입된다.
  */
 export interface SeedGame {
   en: string;
   ko?: string;
+  officialUrl?: string;
 }
 
 export const SEED_GAMES: SeedGame[] = [
   // ── 국내 온라인 (PC) ──
   { en: "League of Legends", ko: "리그 오브 레전드" },
-  { en: "Lost Ark", ko: "로스트아크" },
-  { en: "MapleStory", ko: "메이플스토리" },
+  { en: "Lost Ark", ko: "로스트아크", officialUrl: "https://lostark.game.onstove.com/Main" },
+  { en: "MapleStory", ko: "메이플스토리", officialUrl: "https://maplestory.nexon.com/Home/Main" },
   { en: "MapleStory 2", ko: "메이플스토리2" },
-  { en: "Dungeon Fighter Online", ko: "던전앤파이터" },
-  { en: "Black Desert Online", ko: "검은사막" },
-  { en: "Lineage", ko: "리니지" },
-  { en: "Lineage 2", ko: "리니지2" },
+  { en: "Dungeon Fighter Online", ko: "던전앤파이터", officialUrl: "https://df.nexon.com/" },
+  { en: "Black Desert Online", ko: "검은사막", officialUrl: "https://www.kr.playblackdesert.com/ko-KR/Main/Index" },
+  { en: "Lineage", ko: "리니지", officialUrl: "https://lineage.plaync.com/" },
+  { en: "Lineage 2", ko: "리니지2", officialUrl: "https://lineage2.plaync.com/" },
   { en: "Lineage 2M", ko: "리니지2M" },
-  { en: "Blade and Soul", ko: "블레이드앤소울" },
-  { en: "Mabinogi", ko: "마비노기" },
-  { en: "Vindictus", ko: "빈딕투스" },
+  { en: "Blade and Soul", ko: "블레이드앤소울", officialUrl: "https://bns.plaync.com/" },
+  { en: "Mabinogi", ko: "마비노기", officialUrl: "https://mabinogi.nexon.com/" },
+  { en: "Vindictus", ko: "빈딕투스", officialUrl: "https://heroes.nexon.com/" },
+  // KartRider(원조) 는 2023-03-31, TERA 는 2022-06-30 국내 서비스 종료 —
+  // officialUrl 안 붙임(DISCONTINUED_TITLES 로 목록에서 제외됨).
   { en: "TERA", ko: "테라 온라인" },
-  { en: "Sudden Attack", ko: "서든어택" },
+  { en: "Sudden Attack", ko: "서든어택", officialUrl: "https://sa.nexon.com/" },
   { en: "KartRider", ko: "카트라이더" },
   { en: "KartRider: Drift", ko: "카트라이더 드리프트" },
-  { en: "Crazy Arcade", ko: "크레이지레이싱 카트라이더" },
-  { en: "Elsword", ko: "엘소드" },
-  { en: "Closers", ko: "클로저스" },
+  { en: "Crazy Arcade", ko: "크레이지 아케이드" },
+  { en: "Elsword", ko: "엘소드", officialUrl: "https://www.kog.co.kr/games/elsword" },
+  { en: "Closers", ko: "클로저스", officialUrl: "https://www.naddic.co.kr/ko/game/cls/posts/strategy" },
   { en: "Cabal Online", ko: "카발 온라인" },
   { en: "Ragnarok Online", ko: "라그나로크 온라인" },
-  { en: "Aion", ko: "아이온" },
+  { en: "Aion", ko: "아이온", officialUrl: "https://aion.plaync.com/" },
+  // ArcheAge 는 2025-03-06 국내 서비스 종료 — DISCONTINUED_TITLES 로 제외됨.
   { en: "ArcheAge", ko: "아키에이지" },
   { en: "The Kingdom of the Winds", ko: "바람의나라" },
-  { en: "CrossFire", ko: "크로스파이어" },
+  { en: "CrossFire", ko: "크로스파이어", officialUrl: "https://www.smilegate.com/ko/game/crossfire.do" },
   { en: "PUBG: BATTLEGROUNDS", ko: "배틀그라운드" },
   { en: "The First Descendant", ko: "퍼스트 디센던트" },
   { en: "Dave the Diver", ko: "데이브 더 다이버" },
@@ -103,10 +110,36 @@ export const SEED_GAMES: SeedGame[] = [
 /** RAWG 검색용 영문 타이틀 목록 */
 export const SEED_TITLES: string[] = SEED_GAMES.map((s) => s.en);
 
+function normTitle(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 /** 정규화된 영문명 → 한글명 (GRAC 조회 시 별칭으로 사용) */
 export const SEED_KO_BY_EN: Record<string, string> = Object.fromEntries(
-  SEED_GAMES.filter((s) => s.ko).map((s) => [
-    s.en.toLowerCase().replace(/[^a-z0-9]/g, ""),
-    s.ko as string,
-  ]),
+  SEED_GAMES.filter((s) => s.ko).map((s) => [normTitle(s.en), s.ko as string]),
 );
+
+/** 정규화된 영문명 → 공식 홈페이지 (RAWG 에 스토어 링크가 없을 때 보강용) */
+export const SEED_OFFICIAL_URL_BY_EN: Record<string, string> = Object.fromEntries(
+  SEED_GAMES.filter((s) => s.officialUrl).map((s) => [normTitle(s.en), s.officialUrl as string]),
+);
+
+/**
+ * 서비스가 종료된 게임 — 카탈로그 목록에서 제외한다.
+ * RAWG 는 서비스 종료 여부를 공식 필드로 제공하지 않는다. 그래서 뉴스/공식
+ * 공지로 종료가 "확인된" 게임만 직접 이름(RAWG 상 영문 타이틀)을 추가해
+ * 관리한다 — 확신 없는 건 넣지 않는다 (잘못 빼는 것도 사용자 신뢰를 해친다).
+ */
+export const DISCONTINUED_TITLES: string[] = [
+  "KartRider", // 2023-03-31 국내 서비스 종료
+  "KartRider: Drift", // 2025-10-16 서비스 종료
+  "TERA", // 2022-06-30 국내 서비스 종료
+  "ArcheAge", // 2025-03-06 국내 서비스 종료
+];
+
+const DISCONTINUED_NORM = new Set(DISCONTINUED_TITLES.map(normTitle));
+
+/** 이 이름의 게임이 서비스 종료 목록에 있는지 (RAWG 영문명 기준 비교) */
+export function isDiscontinued(name: string): boolean {
+  return DISCONTINUED_NORM.has(normTitle(name));
+}
