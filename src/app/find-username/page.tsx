@@ -48,7 +48,11 @@ export default function FindUsernamePage() {
       </p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-3">
+        <label htmlFor="find-username-email" className="sr-only">
+          가입한 이메일
+        </label>
         <input
+          id="find-username-email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}

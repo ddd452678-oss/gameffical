@@ -51,7 +51,11 @@ export default function FindPasswordPage() {
         </p>
       ) : (
         <form onSubmit={handleSubmit} className="mt-6 space-y-3">
+          <label htmlFor="find-password-username" className="sr-only">
+            아이디
+          </label>
           <input
+            id="find-password-username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="아이디"

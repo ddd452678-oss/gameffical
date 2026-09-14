@@ -74,7 +74,11 @@ export default function ResetPasswordPage() {
         </p>
       ) : (
         <form onSubmit={handleSubmit} className="mt-6 space-y-3">
+          <label htmlFor="reset-password-new" className="sr-only">
+            새 비밀번호
+          </label>
           <input
+            id="reset-password-new"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -82,7 +86,11 @@ export default function ResetPasswordPage() {
             autoComplete="new-password"
             className="h-11 w-full rounded-xl bg-surface-2 px-3.5 text-sm outline-none ring-1 ring-transparent transition focus:bg-surface focus:ring-brand"
           />
+          <label htmlFor="reset-password-confirm" className="sr-only">
+            새 비밀번호 확인
+          </label>
           <input
+            id="reset-password-confirm"
             type="password"
             value={password2}
             onChange={(e) => setPassword2(e.target.value)}

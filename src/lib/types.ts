@@ -144,3 +144,26 @@ export function computeOverallScore(game: Game): number | null {
   const score = parts.reduce((s, p) => s + p.value * p.weight, 0) / totalWeight;
   return Math.round(score);
 }
+
+/**
+ * 종합 평점의 근거가 얇을 때(소스 1개뿐이거나 표본이 적을 때) 붙일 안내 문구.
+ * 확정된 점수처럼 보이지 않게, 근거가 부족하면 명시적으로 알려준다.
+ */
+export function scoreConfidenceNote(game: Game): string | null {
+  const hasMetacritic = typeof game.metacritic === "number";
+  const hasSteam = typeof game.steam_positive_pct === "number";
+  const hasRawg = typeof game.rawg_rating === "number" && game.rawg_rating > 0;
+  const sourceCount = [hasMetacritic, hasSteam, hasRawg].filter(Boolean).length;
+  if (sourceCount === 0) return null;
+
+  if (sourceCount === 1 && hasRawg && game.rawg_ratings_count < 200) {
+    return `RAWG 투표 ${game.rawg_ratings_count.toLocaleString()}표만 반영된 참고용 점수예요.`;
+  }
+  if (sourceCount === 1 && hasSteam && (game.steam_review_count ?? 0) < 200) {
+    return `Steam 리뷰 ${(game.steam_review_count ?? 0).toLocaleString()}개만 반영된 참고용 점수예요.`;
+  }
+  if (sourceCount === 1) {
+    return "공식 지표 한 곳의 데이터만 반영된 점수예요.";
+  }
+  return null;
+}

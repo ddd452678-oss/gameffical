@@ -14,6 +14,7 @@ import {
   computeOverallScore,
   displayTitle,
   PLATFORM_LABELS,
+  scoreConfidenceNote,
   type Game,
 } from "@/lib/types";
 
@@ -210,6 +211,11 @@ export default async function GameDetailPage({
                   : "—"}
               </MetaRow>
             </div>
+            {scoreConfidenceNote(game) && (
+              <p className="mt-1.5 rounded-lg bg-[#fdf1dc] px-2.5 py-1.5 text-[11px] font-medium text-[#b26a00]">
+                ⚠ {scoreConfidenceNote(game)}
+              </p>
+            )}
             <p className="text-[11px] text-text-dim mt-1.5">
               종합 평점은 Metacritic·RAWG·Steam 등 확보 가능한 공식 지표를 가중
               평균한 값입니다.
