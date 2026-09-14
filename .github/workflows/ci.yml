@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Build (타입체크 포함)
+        run: npm run build
+        env:
+          # 빌드 시점엔 외부 API 키 없이도 샘플 데이터로 폴백하도록 설계돼 있음
+          # (CLAUDE.md 캐싱 전략 참고) - CI 에서는 실제 키가 필요 없다.
+          NEXT_TELEMETRY_DISABLED: "1"
