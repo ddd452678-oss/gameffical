@@ -77,22 +77,47 @@ export function displayTitle(game: Game): string {
 const MOBILE_PLATFORM_NAMES = new Set(["iOS", "Android"]);
 
 /**
+ * 원신처럼 모바일 우선으로 기획됐지만 PC/PS4/PS5/Switch 등에도 동시 서비스되는
+ * 라이브서비스(가챠) 게임 화이트리스트. 이런 게임은 Papers Please, XCOM: Enemy
+ * Unknown 처럼 "PC 게임에 나중에 모바일 포트가 붙은" 게임과 raw_platforms 비율이
+ * 똑같아져서(둘 다 iOS+Android 2개 / 전체 6개 = 1/3) 비율만으로는 구분이
+ * 불가능하다 — 그래서 알려진 타이틀만 직접 화이트리스트로 관리한다.
+ */
+const MOBILE_FIRST_OVERRIDE = new Set(
+  [
+    "Genshin Impact",
+    "Honkai Impact 3rd",
+    "Honkai: Star Rail",
+    "Zenless Zone Zero",
+    "Wuthering Waves",
+    "Goddess of Victory: Nikke",
+    "Diablo Immortal",
+    "Punishing: Gray Raven",
+  ].map((s) => s.toLowerCase().replace(/[^a-z0-9]/g, "")),
+);
+
+/**
  * 모바일이 "주" 플랫폼인 게임인지 판별한다. platform_kinds 에 mobile 이
- * 포함돼 있어도, PC/콘솔 게임에 예전 모바일 포트가 하나 끼어있는 경우
- * (예: Psychonauts 의 2011년 iPad판)까지 모바일 카테고리에 넣지 않기 위함.
+ * 포함돼 있어도, PC/콘솔 게임에 모바일 포트가 하나 끼어있는 경우(예:
+ * Psychonauts 의 2011년 iPad판, Papers Please/XCOM 의 모바일 이식판)까지
+ * 모바일 카테고리에 넣지 않기 위함.
  *
- * raw_platforms 중 모바일(iOS/Android) 비중이 1/3 이상이면 모바일 주력으로 본다.
- * 절반 기준이 아니라 1/3 로 완화한 이유: 원신처럼 모바일 우선으로 기획된
- * 라이브서비스 게임도 PS4/PS5/Switch 등 콘솔 버전이 여러 개라 플랫폼 개수 자체가
- * 많아지는데, 절반 기준이면 이런 게임까지 걸러져 버린다.
+ * raw_platforms 중 모바일(iOS/Android)이 과반이면 모바일 주력으로 본다.
+ * 과반 기준만으로는 원신처럼 PC/콘솔 버전이 여러 개라 플랫폼 개수 자체가
+ * 많아지는 라이브서비스 게임까지 걸러지므로, 그런 알려진 타이틀은
+ * MOBILE_FIRST_OVERRIDE 화이트리스트로 별도 처리한다.
  */
 export function isPrimaryMobile(game: Game): boolean {
   if (!game.platform_kinds.includes("mobile")) return false;
+  if (MOBILE_FIRST_OVERRIDE.has(game.name.toLowerCase().replace(/[^a-z0-9]/g, ""))) {
+    return true;
+  }
   const mobileCount = game.raw_platforms.filter((p) =>
     MOBILE_PLATFORM_NAMES.has(p),
   ).length;
   if (mobileCount === 0) return false;
-  return game.raw_platforms.length <= mobileCount * 3;
+  const otherCount = game.raw_platforms.length - mobileCount;
+  return mobileCount > otherCount;
 }
 
 /**

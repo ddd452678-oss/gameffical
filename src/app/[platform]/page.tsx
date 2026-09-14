@@ -52,8 +52,9 @@ export default async function PlatformPage({
       </div>
       {kind === "mobile" && (
         <p className="mb-6 rounded-2xl bg-surface px-4 py-3 text-xs leading-relaxed text-text-dim shadow-card">
-          모바일 게임은 공식 평점 API가 없어 종합 평점 대신 겜피셜 유저 리뷰를
-          중심으로 제공합니다.
+          모바일 전용 게임은 공식 평점 API가 없어 종합 평점 대신 겜피셜 유저
+          리뷰를 참고해 주세요. (PC·콘솔에도 함께 서비스되는 게임은 해당
+          플랫폼의 공식 평점이 표시됩니다)
         </p>
       )}
       <GameGrid games={games} />

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SearchBox } from "@/components/SearchBox";
 import { AuthStatus } from "@/components/AuthStatus";
+import { HeaderNav } from "@/components/HeaderNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,14 +10,6 @@ export const metadata: Metadata = {
   description:
     "전 세계 PC·모바일·콘솔 게임을 공식 데이터 기반 종합 평점과 함께 탐색하고, 과금 부담도·확률형 아이템 투명성까지 담은 유저 리뷰를 남기세요.",
 };
-
-const NAV = [
-  { href: "/pc", label: "PC" },
-  { href: "/mobile", label: "모바일" },
-  { href: "/console", label: "콘솔" },
-  { href: "/domestic", label: "국내" },
-  { href: "/overseas", label: "해외" },
-];
 
 export default function RootLayout({
   children,
@@ -26,27 +19,19 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className="min-h-screen">
-        <header className="sticky top-0 z-30 border-b border-border bg-surface/80 backdrop-blur-md">
-          <div className="mx-auto flex h-16 max-w-6xl items-center gap-8 px-5">
+        <header className="sticky top-0 z-30 border-b border-border bg-surface/80 backdrop-blur-md relative">
+          <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-5 sm:gap-4">
             <Link
               href="/"
-              className="text-xl font-extrabold tracking-tight"
+              className="shrink-0 text-xl font-extrabold tracking-tight"
             >
               겜<span className="text-brand">피셜</span>
             </Link>
-            <nav className="flex items-center gap-1 text-[15px] font-semibold">
-              {NAV.map((n) => (
-                <Link
-                  key={n.href}
-                  href={n.href}
-                  className="rounded-xl px-3.5 py-2 text-text-dim transition-colors hover:bg-surface-2 hover:text-text"
-                >
-                  {n.label}
-                </Link>
-              ))}
-            </nav>
-            <SearchBox />
-            <AuthStatus />
+            <HeaderNav />
+            <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <SearchBox />
+              <AuthStatus />
+            </div>
           </div>
         </header>
         <main className="mx-auto max-w-6xl px-5 py-10">{children}</main>

@@ -18,3 +18,9 @@ npm-debug.log*
 
 # 개인 메모
 보완필요사항.txt
+
+# 로컬/에이전트 테스트 산출물 (Playwright MCP 트레이스, 임시 스크린샷)
+.playwright-mcp/
+/*-desktop.png
+/*-mobile.png
+/_check-*.png

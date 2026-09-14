@@ -21,12 +21,12 @@ export default async function HomePage() {
           전 세계 PC·모바일·콘솔 게임을 종합 평점과 함께 탐색하고, 과금 부담도와
           확률형 아이템 투명성까지 담은 유저 리뷰를 확인하세요.
         </p>
-        <div className="mt-8 flex justify-center gap-2.5">
+        <div className="mt-8 flex flex-wrap justify-center gap-2.5">
           {ORDER.map((k) => (
             <Link
               key={k}
               href={`/${k}`}
-              className="rounded-2xl bg-brand px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-dim"
+              className="whitespace-nowrap rounded-2xl bg-brand px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-dim sm:px-5"
             >
               {PLATFORM_LABELS[k]}
             </Link>

@@ -46,10 +46,22 @@ const DOMESTIC_PUBLISHER_RE =
   /넥슨|엔씨소프트|스마일게이트|카카오게임즈|넷마블|펄어비스|위메이드|그라비티|웹젠|네오위즈|엑스엘게임즈|나딕|시프트업|블루홀|크래프톤|컴투스|데브시스터즈|라인게임즈/;
 
 /**
+ * DOMESTIC_PUBLISHER_RE 로는 국내로 잡히지만 실제로는 해외 개발작인 예외.
+ * 예: 헤비 레인/비욘드: 투 소울즈(둘 다 프랑스 퀀틱드림 개발)는 GRAC 등록상
+ * entname 이 "주식회사 스마일게이트"로 나오는데, 이는 개발/서비스 주체가
+ * 아니라 국내 스팀 유통(스토브 등)을 대행하는 역할일 뿐이다 — "GRAC 등록
+ * 업체 = 국내 게임사"라는 가정이 깨지는 케이스. 발견되는 대로 추가한다.
+ */
+const NOT_DOMESTIC_OVERRIDE = new Set(
+  ["Heavy Rain", "Beyond: Two Souls", "Detroit: Become Human"].map(normKey),
+);
+
+/**
  * 국내(한국) 게임 여부. GRAC 로 배급사 정보가 채워진 게임만 판별 가능하므로
  * best-effort 이며, 정보가 없으면 해외 카테고리로 분류된다.
  */
 export function isDomesticGame(game: Game): boolean {
+  if (NOT_DOMESTIC_OVERRIDE.has(normKey(game.name))) return false;
   return !!game.publisher && DOMESTIC_PUBLISHER_RE.test(game.publisher);
 }
 
@@ -593,18 +605,32 @@ export async function listGamesByRegion(
   return filtered;
 }
 
-/** 메인 페이지용: 플랫폼별 소수의 대표 게임 */
+/**
+ * 메인 페이지용: 플랫폼별 소수의 대표 게임.
+ * 인기 AAA 타이틀은 PC/콘솔에 동시 출시된 경우가 많아, 인기순으로만 12개씩
+ * 뽑으면 두 섹션이 거의 동일한 목록이 되어버린다(실제로 상위권이 겹침).
+ * 각 플랫폼 전용 목록(/pc, /console)은 그대로 전체를 보여주되, 메인
+ * 미리보기에서는 앞 섹션에 이미 나온 게임을 다음 섹션에서 건너뛰어 세
+ * 섹션이 서로 다른 게임을 보여주도록 한다.
+ */
 export async function listFeatured(): Promise<Record<PlatformKind, Game[]>> {
   const [pc, mobile, console_] = await Promise.all([
     listGamesByPlatform("pc"),
     listGamesByPlatform("mobile"),
     listGamesByPlatform("console"),
   ]);
-  return {
-    pc: pc.slice(0, 12),
-    mobile: mobile.slice(0, 12),
-    console: console_.slice(0, 12),
+  const shown = new Set<number>();
+  const pick = (games: Game[]): Game[] => {
+    const out: Game[] = [];
+    for (const g of games) {
+      if (shown.has(g.id)) continue;
+      shown.add(g.id);
+      out.push(g);
+      if (out.length === 12) break;
+    }
+    return out;
   };
+  return { pc: pick(pc), mobile: pick(mobile), console: pick(console_) };
 }
 
 export { SAMPLE_GAMES };

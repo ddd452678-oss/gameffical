@@ -1,0 +1,87 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const NAV = [
+  { href: "/pc", label: "PC" },
+  { href: "/mobile", label: "모바일" },
+  { href: "/console", label: "콘솔" },
+  { href: "/domestic", label: "국내" },
+  { href: "/overseas", label: "해외" },
+];
+
+/**
+ * 데스크톱: 가로 메뉴 그대로 표시.
+ * 모바일(md 미만): 햄버거 버튼 + 드롭다운 패널로 전환한다.
+ * (예전엔 좁은 화면에서 메뉴/로고 글자가 세로로 쪼개져 쌓이고 페이지 전체가
+ * 가로로 스크롤되는 문제가 있었음 — 폭에 안 맞으면 줄이 아니라 접어야 한다)
+ */
+export function HeaderNav() {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <nav className="hidden items-center gap-1 text-[15px] font-semibold md:flex">
+        {NAV.map((n) => (
+          <Link
+            key={n.href}
+            href={n.href}
+            className={`rounded-xl px-3.5 py-2 transition-colors hover:bg-surface-2 hover:text-text ${
+              pathname === n.href ? "text-text" : "text-text-dim"
+            }`}
+          >
+            {n.label}
+          </Link>
+        ))}
+      </nav>
+
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label={open ? "메뉴 닫기" : "메뉴 열기"}
+        aria-expanded={open}
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-text-dim transition-colors hover:bg-surface-2 md:hidden"
+      >
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          {open ? (
+            <path
+              d="M5 5l10 10M15 5L5 15"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+          ) : (
+            <path
+              d="M3 5.5h14M3 10h14M3 14.5h14"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+          )}
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute inset-x-0 top-full z-20 border-b border-border bg-surface px-5 py-3 shadow-card md:hidden">
+          <nav className="grid grid-cols-2 gap-1 text-[15px] font-semibold">
+            {NAV.map((n) => (
+              <Link
+                key={n.href}
+                href={n.href}
+                onClick={() => setOpen(false)}
+                className={`rounded-xl px-3.5 py-2.5 transition-colors hover:bg-surface-2 hover:text-text ${
+                  pathname === n.href ? "bg-surface-2 text-text" : "text-text-dim"
+                }`}
+              >
+                {n.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      )}
+    </>
+  );
+}
