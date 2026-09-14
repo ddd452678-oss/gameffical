@@ -30,17 +30,42 @@ const PLATFORM_LIST_LIMIT = 1000;
 const SEED_NORM = new Set(
   SEED_TITLES.map((t) => t.toLowerCase().replace(/[^a-z0-9]/g, "")),
 );
-const KOREAN_PUBLISHER_RE =
-  /넥슨|엔씨|엔씨소프트|스마일게이트|카카오게임즈|넷마블|펄어비스|위메이드|그라비티|웹젠|네오위즈|엑스엘게임즈|나딕|시프트업|라이엇게임즈코리아|블루홀|크래프톤|호요버스|호요|미호요/;
+// 실제 한국 게임사 목록 — 이 배열이 유일한 출처(single source of truth)다.
+// isDomesticGame(국내/해외 분류)과 koreanRelevance(노출 우선순위 boost) 둘 다
+// 여기서 파생시켜서, 예전처럼 두 정규식을 따로 손보다 하나만 갱신하고 잊어버리는
+// 실수(실제로 라이엇게임즈코리아/호요버스가 한쪽에만 있었음)를 막는다.
+const KOREAN_PUBLISHERS = [
+  "넥슨",
+  "엔씨",
+  "엔씨소프트",
+  "스마일게이트",
+  "카카오게임즈",
+  "넷마블",
+  "펄어비스",
+  "위메이드",
+  "그라비티",
+  "웹젠",
+  "네오위즈",
+  "엑스엘게임즈",
+  "나딕",
+  "시프트업",
+  "블루홀",
+  "크래프톤",
+  "컴투스",
+  "데브시스터즈",
+  "라인게임즈",
+];
+const DOMESTIC_PUBLISHER_RE = new RegExp(KOREAN_PUBLISHERS.join("|"));
 
 /**
- * 실제 국내(한국) 게임사 배급/개발 게임 판별용 — GRAC 등록 업체명(publisher) 기준.
- * 위 KOREAN_PUBLISHER_RE 는 "한국 유저 관련도"(목록 노출 우선순위) 용도라
- * 라이엇게임즈코리아·호요버스처럼 해외 원산 게임의 한국 법인/배급명도 포함하지만,
- * 국내/해외 카테고리 분류는 실제 한국 게임사만 좁혀서 사용한다.
+ * "한국 유저 관련도"(목록 노출 우선순위) 판별용 — 위 실제 한국 게임사 목록에,
+ * 라이엇게임즈코리아·호요버스처럼 해외 원산 게임의 한국 법인/배급명까지
+ * 추가로 포함한다. isDomesticGame(국내/해외 카테고리 분류)에는 이 확장분을
+ * 쓰지 않는다 — 원산지가 국내가 아니라서다.
  */
-const DOMESTIC_PUBLISHER_RE =
-  /넥슨|엔씨소프트|스마일게이트|카카오게임즈|넷마블|펄어비스|위메이드|그라비티|웹젠|네오위즈|엑스엘게임즈|나딕|시프트업|블루홀|크래프톤|컴투스|데브시스터즈|라인게임즈/;
+const KOREAN_RELEVANCE_RE = new RegExp(
+  [...KOREAN_PUBLISHERS, "라이엇게임즈코리아", "호요버스", "호요", "미호요"].join("|"),
+);
 
 /**
  * DOMESTIC_PUBLISHER_RE 로는 국내로 잡히지만 실제로는 해외 개발작인 예외.
@@ -95,7 +120,7 @@ function koreanRelevance(g: Game): number {
   let s = 0;
   if (SEED_NORM.has(g.name.toLowerCase().replace(/[^a-z0-9]/g, ""))) s += 2;
   if (g.genres_ko.length > 0) s += 1;
-  if (g.publisher && KOREAN_PUBLISHER_RE.test(g.publisher)) s += 1;
+  if (g.publisher && KOREAN_RELEVANCE_RE.test(g.publisher)) s += 1;
   return s;
 }
 
