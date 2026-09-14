@@ -26,9 +26,6 @@ import { isPrimaryMobile, type Game, type PlatformKind } from "./types";
 // 페이지네이션한다 ([platform]/page.tsx 참고).
 const PLATFORM_LIST_LIMIT = 1000;
 
-// 카탈로그(이름/이미지/장르 등) 갱신 주기: 7일
-const CATALOG_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
 // 시드 타이틀(국내/주요 게임) 정규화 집합 — 목록 상단 노출용
 const SEED_NORM = new Set(
   SEED_TITLES.map((t) => t.toLowerCase().replace(/[^a-z0-9]/g, "")),
@@ -140,6 +137,8 @@ function rowToGame(row: Record<string, unknown>): Game {
     steam_appid: (row.steam_appid as string) ?? null,
     steam_positive_pct: (row.steam_positive_pct as number) ?? null,
     steam_review_count: (row.steam_review_count as number) ?? null,
+    // 컬럼이 없던 기존 행은 아주 오래된 시각으로 채워서 다음 조회 때 바로 갱신 대상이 되게 한다.
+    ratings_updated_at: (row.ratings_updated_at as string) ?? new Date(0).toISOString(),
     genres_ko: (row.genres_ko as string[]) ?? [],
     age_rating: (row.age_rating as string) ?? null,
     content_descriptors: (row.content_descriptors as string[]) ?? [],
@@ -167,6 +166,7 @@ function gameToRow(game: Game) {
     steam_appid: extractSteamAppId(game),
     steam_positive_pct: game.steam_positive_pct,
     steam_review_count: game.steam_review_count,
+    ratings_updated_at: game.ratings_updated_at,
     genres_ko: game.genres_ko ?? [],
     age_rating: game.age_rating ?? null,
     content_descriptors: game.content_descriptors ?? [],
@@ -198,7 +198,12 @@ export async function listGamesByPlatform(kind: PlatformKind): Promise<Game[]> {
 
 /**
  * 위 함수의 실제 조회 로직.
- * 1) Supabase 캐시에 유효한 데이터가 있으면 사용
+ * 1) Supabase 캐시에 있으면 사용 (신선도로 존재 여부를 거르지 않는다 — 예전엔
+ *    metadata_updated_at 이 CATALOG_TTL_MS 지난 행을 쿼리에서 아예 제외했는데,
+ *    catalog_progress 크론 커서가 카탈로그 전체를 한 바퀴 도는 데 수개월 걸릴
+ *    수 있어서, 초기에 캐싱된 게임이 재조회 기회도 없이 목록에서 통째로
+ *    사라지는 문제가 있었다. 신선하지 않은 데이터라도 우선 보여주고, 실제
+ *    갱신은 refreshCatalog/gracEnrichCached 크론이 백그라운드에서 담당한다)
  * 2) 없으면 RAWG 에서 가져와 캐시에 저장
  * 3) RAWG 키도 없으면 샘플 데이터
  */
@@ -206,12 +211,10 @@ async function listGamesByPlatformRaw(kind: PlatformKind): Promise<Game[]> {
   const supabase = getSupabase();
 
   if (supabase) {
-    const freshAfter = new Date(Date.now() - CATALOG_TTL_MS).toISOString();
     const { data, error } = await supabase
       .from("games")
       .select("*")
       .contains("platform_kinds", [kind])
-      .gte("metadata_updated_at", freshAfter)
       .order("rawg_ratings_count", { ascending: false })
       .limit(PLATFORM_LIST_LIMIT);
     if (!error && data && data.length > 0) {

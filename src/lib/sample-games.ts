@@ -9,6 +9,7 @@ type RawSample = Omit<
   | "publisher"
   | "source"
   | "name_ko"
+  | "ratings_updated_at"
 >;
 
 /**
@@ -236,6 +237,7 @@ export const SAMPLE_GAMES: Game[] = RAW_SAMPLES.map((g) => ({
   content_descriptors: [],
   publisher: null,
   source: "sample",
+  ratings_updated_at: new Date(0).toISOString(),
   name_ko: SEED_KO_BY_EN[g.name.toLowerCase().replace(/[^a-z0-9]/g, "")] ?? null,
 }));
 

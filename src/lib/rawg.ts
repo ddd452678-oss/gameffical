@@ -84,6 +84,7 @@ function toGame(item: RawgListItem, detail?: RawgDetail): Game {
     steam_appid: null,
     steam_positive_pct: null,
     steam_review_count: null,
+    ratings_updated_at: new Date(0).toISOString(), // 아직 Steam 평점을 가져온 적 없음 -> 다음 조회 때 갱신 대상
     genres_ko: [],
     age_rating: null,
     content_descriptors: [],

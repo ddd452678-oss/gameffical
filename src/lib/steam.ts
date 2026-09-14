@@ -96,14 +96,22 @@ export async function fetchSteamKoreanDescription(
   }
 }
 
+// 평점처럼 자주 바뀌는 값의 갱신 주기 (CLAUDE.md 캐싱 전략: 몇 시간~하루)
+const RATINGS_TTL_MS = 24 * 60 * 60 * 1000;
+
 /**
- * 게임에 Steam appid 가 있고 긍정비율이 아직 없으면 Steam 지표를 채워 반환한다.
- * 항상 새 객체를 반환하지 않는다 — 변경이 없으면 입력을 그대로 돌려준다(호출부에서 참조 비교 가능).
+ * 게임에 Steam appid 가 있고, 긍정비율이 없거나 TTL 이 지났으면 Steam 지표를
+ * 다시 가져와 채운다. 항상 새 객체를 반환하지 않는다 — 변경이 없으면 입력을
+ * 그대로 돌려준다(호출부에서 참조 비교 가능).
  */
 export async function enrichSteamRatings(game: Game): Promise<Game> {
   const appid = game.steam_appid;
   if (!appid) return game;
-  if (game.steam_positive_pct != null) return game;
+
+  const isFresh =
+    game.steam_positive_pct != null &&
+    Date.now() - new Date(game.ratings_updated_at).getTime() < RATINGS_TTL_MS;
+  if (isFresh) return game;
 
   const summary = await fetchSteamReviewSummary(appid);
   if (!summary) return game;
@@ -112,5 +120,6 @@ export async function enrichSteamRatings(game: Game): Promise<Game> {
     ...game,
     steam_positive_pct: summary.positivePct,
     steam_review_count: summary.reviewCount,
+    ratings_updated_at: new Date().toISOString(),
   };
 }
