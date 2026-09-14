@@ -12,6 +12,7 @@ import { getDisplayName } from "@/lib/display-name";
 import { isDiscontinued } from "@/lib/seed-titles";
 import {
   computeOverallScore,
+  displayGenres,
   displayTitle,
   PLATFORM_LABELS,
   scoreConfidenceNote,
@@ -120,9 +121,7 @@ export default async function GameDetailPage({
               )}
             </div>
             <p className="mt-1 text-sm text-text-dim">
-              {(game.genres_ko.length ? game.genres_ko : game.genres).join(
-                " · ",
-              ) || "장르 정보 없음"}
+              {displayGenres(game).join(" · ") || "장르 정보 없음"}
             </p>
             <div className="mt-2.5 flex flex-wrap gap-1.5">
               {game.platform_kinds.map((k) => (
@@ -154,9 +153,7 @@ export default async function GameDetailPage({
             <h2 className="mb-2.5 text-lg font-extrabold">정보</h2>
             <div className="rounded-2xl bg-surface px-5 py-2 shadow-card">
               <MetaRow label="장르">
-                {(game.genres_ko.length ? game.genres_ko : game.genres).join(
-                  ", ",
-                ) || "—"}
+                {displayGenres(game).join(", ") || "—"}
               </MetaRow>
               <MetaRow label="출시일">{game.released ?? "미정"}</MetaRow>
               <MetaRow label="플랫폼">

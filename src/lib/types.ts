@@ -68,6 +68,40 @@ export interface ReviewStats {
 }
 
 /**
+ * RAWG 장르명 -> 한국어. GRAC 로 보강된 게임은 genres_ko(GRAC 고유 장르
+ * 체계)를 쓰고, 그렇지 않은 게임은 이 표로 RAWG 장르를 번역해서 쓴다 —
+ * 안 그러면 같은 화면 안에서 "액션"과 "Action, Shooter"가 뒤섞여 보인다.
+ * 표에 없는 장르는 원문 그대로 둔다.
+ */
+const RAWG_GENRE_KO: Record<string, string> = {
+  Action: "액션",
+  Indie: "인디",
+  Adventure: "어드벤처",
+  RPG: "RPG",
+  Strategy: "전략",
+  Shooter: "슈터",
+  Casual: "캐주얼",
+  Simulation: "시뮬레이션",
+  Puzzle: "퍼즐",
+  Arcade: "아케이드",
+  Platformer: "플랫포머",
+  "Massively Multiplayer": "MMO",
+  Racing: "레이싱",
+  Sports: "스포츠",
+  Fighting: "대전 격투",
+  Family: "가족",
+  "Board Games": "보드게임",
+  Educational: "교육",
+  Card: "카드",
+};
+
+/** 표시용 장르 목록: genres_ko(GRAC)가 있으면 그대로, 없으면 RAWG 장르를 번역해서 반환. */
+export function displayGenres(game: Game): string[] {
+  if (game.genres_ko.length > 0) return game.genres_ko;
+  return game.genres.map((g) => RAWG_GENRE_KO[g] ?? g);
+}
+
+/**
  * 카드/상세 제목에 쓰는 표시용 이름. 한글명이 있으면 "한글명 | 영문명" 형태로,
  * 없으면 원래 이름만 반환한다.
  */
