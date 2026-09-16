@@ -551,6 +551,56 @@ function seedEnglishMatches(query: string): string[] {
 }
 
 /**
+ * 프랜차이즈 한글 별칭. SEED_KO_BY_EN 은 타이틀 하나하나를 정확히 매칭해야
+ * 하는데, "포켓몬"처럼 시리즈 전체(수십 개 타이틀)를 한글로 찾고 싶을 때는
+ * 타이틀마다 시드를 등록하는 대신 시리즈명 접두어 하나로 전부 찾게 한다.
+ * (예: "포켓몬" 검색 → name ilike '%Pokémon%' 로 캐싱된 모든 포켓몬 타이틀 매칭)
+ */
+const FRANCHISE_ALIASES: Record<string, string> = {
+  포켓몬: "Pokémon",
+  젤다: "Zelda",
+  마리오: "Mario",
+  동물의숲: "Animal Crossing",
+  파이널판타지: "Final Fantasy",
+  드래곤퀘스트: "Dragon Quest",
+  몬스터헌터: "Monster Hunter",
+  커비: "Kirby",
+  바이오하자드: "Resident Evil",
+  레지던트이블: "Resident Evil",
+  스트리트파이터: "Street Fighter",
+  철권: "Tekken",
+  페르소나: "Persona",
+  다크소울: "Dark Souls",
+  콜오브듀티: "Call of Duty",
+  어쌔신크리드: "Assassin's Creed",
+  헤일로: "Halo",
+  갓오브워: "God of War",
+  언차티드: "Uncharted",
+  라스트오브어스: "The Last of Us",
+  스타워즈: "Star Wars",
+  툼레이더: "Tomb Raider",
+  배틀필드: "Battlefield",
+  심즈: "The Sims",
+  심시티: "SimCity",
+  문명: "Civilization",
+  디아블로: "Diablo",
+  워크래프트: "Warcraft",
+  하스스톤: "Hearthstone",
+  진삼국무쌍: "Dynasty Warriors",
+};
+
+/** 검색어가 프랜차이즈 별칭에 걸리면 대응하는 영문 검색어(시리즈 접두어)를 반환. */
+function franchiseEnglishMatches(query: string): string[] {
+  const stripSpace = (s: string) => s.replace(/\s+/g, "");
+  const nq = stripSpace(query);
+  const seen = new Set<string>();
+  for (const [ko, en] of Object.entries(FRANCHISE_ALIASES)) {
+    if (nq.includes(ko) || ko.includes(nq)) seen.add(en);
+  }
+  return [...seen];
+}
+
+/**
  * 이름으로 게임 검색 (영문/한글 모두 지원).
  * 1) Supabase 캐시에서 이름(영문/한글) 부분일치 (trigram 인덱스)
  * 2) 없으면 RAWG 검색 → 캐시에 저장 (한글 검색어는 시드 목록으로 영문 변환)
@@ -560,6 +610,7 @@ export async function searchGamesByName(query: string): Promise<Game[]> {
   const q = query.trim();
   if (!q) return [];
   const seedEnMatches = seedEnglishMatches(q);
+  const franchiseEnMatches = franchiseEnglishMatches(q);
 
   const supabase = getSupabase();
   if (supabase) {
@@ -569,6 +620,9 @@ export async function searchGamesByName(query: string): Promise<Game[]> {
       supabase.from("games").select("*").ilike("name", `%${q}%`),
       supabase.from("games").select("*").ilike("name_ko", `%${q}%`),
       ...seedEnMatches.map((en) =>
+        supabase.from("games").select("*").ilike("name", `%${en}%`),
+      ),
+      ...franchiseEnMatches.map((en) =>
         supabase.from("games").select("*").ilike("name", `%${en}%`),
       ),
     ];
@@ -594,8 +648,8 @@ export async function searchGamesByName(query: string): Promise<Game[]> {
   }
 
   try {
-    // 한글 검색어가 시드 목록에 매칭되면 그 영문명으로 RAWG 검색
-    const rawgQuery = seedEnMatches[0] ?? q;
+    // 한글 검색어가 시드 목록/프랜차이즈 별칭에 매칭되면 그 영문명으로 RAWG 검색
+    const rawgQuery = seedEnMatches[0] ?? franchiseEnMatches[0] ?? q;
     const results = (await searchGames(rawgQuery))
       .map(withSeedKoName)
       .filter((g) => !isDiscontinued(g.name));
