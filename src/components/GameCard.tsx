@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ScoreBadge } from "./ScoreBadge";
+import { LikeButton } from "./LikeButton";
 import { computeOverallScore, displayGenres, displayTitle, type Game } from "@/lib/types";
 
 export function GameCard({ game }: { game: Game }) {
@@ -7,34 +8,39 @@ export function GameCard({ game }: { game: Game }) {
   return (
     <Link
       href={`/game/${game.id}`}
-      className="group overflow-hidden rounded-2xl bg-surface shadow-card transition-all duration-200 hover:-translate-y-1 hover:shadow-card-hover"
+      className="group relative block aspect-[16/9] overflow-hidden rounded-xl bg-surface-2 shadow-card transition-all duration-200 hover:shadow-card-hover"
     >
-      <div className="aspect-[16/9] overflow-hidden bg-surface-2">
-        {game.background_image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={game.background_image}
-            alt={game.name}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
-        ) : (
-          <div className="grid h-full w-full place-items-center text-sm text-text-dim">
-            이미지 없음
-          </div>
-        )}
-      </div>
-      <div className="flex items-start gap-3 p-3.5">
-        <ScoreBadge score={score} size="sm" />
-        <div className="min-w-0">
-          <h3 className="truncate text-[15px] font-bold">{displayTitle(game)}</h3>
-          <p className="mt-0.5 truncate text-xs text-text-dim">
-            {displayGenres(game).slice(0, 3).join(" · ") || "장르 정보 없음"}
-          </p>
-          <p className="mt-1 text-[11px] text-text-dim">
-            {game.released?.slice(0, 4) ?? "출시일 미정"}
-          </p>
+      {game.background_image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={game.background_image}
+          alt={game.name}
+          loading="lazy"
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+      ) : (
+        <div className="grid h-full w-full place-items-center text-sm text-text-dim">
+          이미지 없음
         </div>
+      )}
+
+      {/* 하단 그라데이션 스크림 — 그 위에 제목/장르를 얹기 위함 */}
+      <div className="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-black/95 via-black/50 to-transparent" />
+
+      <div className="absolute left-2 top-2">
+        <ScoreBadge score={score} size="sm" />
+      </div>
+      <div className="absolute right-2 top-2">
+        <LikeButton target="game" targetId={game.id} />
+      </div>
+
+      <div className="absolute inset-x-0 bottom-0 p-3">
+        <h3 className="truncate text-[15px] font-bold text-white">{displayTitle(game)}</h3>
+        <p className="mt-0.5 truncate text-xs text-white/65">
+          {[displayGenres(game).slice(0, 2).join(" · "), game.released?.slice(0, 4)]
+            .filter(Boolean)
+            .join(" · ") || "정보 없음"}
+        </p>
       </div>
     </Link>
   );
@@ -49,7 +55,7 @@ export function GameGrid({ games }: { games: Game[] }) {
     );
   }
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {games.map((g) => (
         <GameCard key={g.id} game={g} />
       ))}

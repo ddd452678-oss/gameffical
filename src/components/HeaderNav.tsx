@@ -16,6 +16,7 @@ const REGION_NAV = [
   { href: "/domestic", label: "국내" },
   { href: "/overseas", label: "해외" },
 ];
+const COMMUNITY_NAV = [{ href: "/board", label: "게시판" }];
 
 /**
  * 데스크톱: 가로 메뉴 그대로 표시.
@@ -48,6 +49,18 @@ export function HeaderNav() {
             href={n.href}
             className={`rounded-xl px-3.5 py-2 transition-colors hover:bg-surface-2 hover:text-text ${
               pathname === n.href ? "text-text" : "text-text-dim"
+            }`}
+          >
+            {n.label}
+          </Link>
+        ))}
+        <div className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+        {COMMUNITY_NAV.map((n) => (
+          <Link
+            key={n.href}
+            href={n.href}
+            className={`rounded-xl px-3.5 py-2 transition-colors hover:bg-surface-2 hover:text-text ${
+              pathname.startsWith(n.href) ? "text-text" : "text-text-dim"
             }`}
           >
             {n.label}
@@ -107,6 +120,21 @@ export function HeaderNav() {
                 onClick={() => setOpen(false)}
                 className={`rounded-xl px-3.5 py-2.5 transition-colors hover:bg-surface-2 hover:text-text ${
                   pathname === n.href ? "bg-surface-2 text-text" : "text-text-dim"
+                }`}
+              >
+                {n.label}
+              </Link>
+            ))}
+          </nav>
+          <p className="px-1 pb-1 pt-3 text-[11px] font-semibold text-text-dim">커뮤니티</p>
+          <nav className="grid grid-cols-2 gap-1 text-[15px] font-semibold">
+            {COMMUNITY_NAV.map((n) => (
+              <Link
+                key={n.href}
+                href={n.href}
+                onClick={() => setOpen(false)}
+                className={`rounded-xl px-3.5 py-2.5 transition-colors hover:bg-surface-2 hover:text-text ${
+                  pathname.startsWith(n.href) ? "bg-surface-2 text-text" : "text-text-dim"
                 }`}
               >
                 {n.label}

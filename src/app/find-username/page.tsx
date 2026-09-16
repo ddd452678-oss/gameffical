@@ -61,13 +61,13 @@ export default function FindUsernamePage() {
           className="h-11 w-full rounded-xl bg-surface-2 px-3.5 text-sm outline-none ring-1 ring-transparent transition focus:bg-surface focus:ring-brand"
         />
         {error && (
-          <p className="rounded-xl bg-[#fdeaea] px-3 py-2.5 text-sm font-medium text-[#d84343]">
+          <p className="rounded-xl bg-bad/15 px-3 py-2.5 text-sm font-medium text-bad">
             {error}
           </p>
         )}
         {result &&
           (result.found ? (
-            <p className="rounded-xl bg-[#e7f4ee] px-3 py-2.5 text-sm font-medium text-[#188652]">
+            <p className="rounded-xl bg-good/15 px-3 py-2.5 text-sm font-medium text-good">
               회원님의 아이디는{" "}
               <span className="font-extrabold">{result.maskedUsername}</span>{" "}
               입니다.
@@ -80,7 +80,7 @@ export default function FindUsernamePage() {
         <button
           type="submit"
           disabled={busy}
-          className="h-12 w-full rounded-xl bg-brand text-sm font-bold text-white transition-colors hover:bg-brand-dim disabled:opacity-50"
+          className="h-12 w-full rounded-xl bg-brand text-sm font-bold text-[#181008] transition-colors hover:bg-brand-dim disabled:opacity-50"
         >
           {busy ? "확인 중…" : "아이디 찾기"}
         </button>

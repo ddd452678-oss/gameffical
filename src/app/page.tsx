@@ -10,10 +10,26 @@ const ORDER: PlatformKind[] = ["pc", "mobile", "console"];
 export default async function HomePage() {
   const featured = await listFeatured();
 
+  const heroImages = [...featured.pc, ...featured.console, ...featured.mobile]
+    .map((g) => g.background_image)
+    .filter((src): src is string => !!src)
+    .slice(0, 6);
+
   return (
     <div className="space-y-16">
-      <section className="rounded-[24px] bg-surface px-6 py-16 text-center shadow-card">
-        <h1 className="text-3xl font-extrabold leading-[1.3] tracking-tight sm:text-[40px]">
+      <section className="relative overflow-hidden rounded-2xl px-6 py-20 text-center sm:py-28">
+        <div className="absolute inset-0 -z-10 bg-surface">
+          <div className="grid h-full grid-cols-3 sm:grid-cols-6">
+            {heroImages.map((src, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={i} src={src} alt="" className="h-full w-full object-cover" />
+            ))}
+          </div>
+          <div className="absolute inset-0 backdrop-blur-2xl" />
+          <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/90 to-bg/55" />
+        </div>
+
+        <h1 className="text-3xl font-extrabold leading-[1.3] tracking-tight sm:text-[42px]">
           게임, <span className="text-brand">공식 데이터</span>로
           <br className="hidden sm:block" /> 먼저 보고 고르세요
         </h1>
@@ -26,7 +42,7 @@ export default async function HomePage() {
             <Link
               key={k}
               href={`/${k}`}
-              className="whitespace-nowrap rounded-2xl bg-brand px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-dim sm:px-5"
+              className="whitespace-nowrap rounded-xl bg-brand px-4 py-3 text-sm font-bold text-[#181008] transition-colors hover:bg-brand-dim sm:px-5"
             >
               {PLATFORM_LABELS[k]}
             </Link>
@@ -42,7 +58,7 @@ export default async function HomePage() {
               href={`/${k}`}
               className="text-sm font-semibold text-brand hover:underline"
             >
-              전체 보기 →
+              전체 보기
             </Link>
           </div>
           <GameGrid games={featured[k]} />

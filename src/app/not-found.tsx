@@ -9,7 +9,7 @@ export default function NotFound() {
       </p>
       <Link
         href="/"
-        className="mt-7 inline-block rounded-2xl bg-brand px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-brand-dim"
+        className="mt-7 inline-block rounded-2xl bg-brand px-5 py-3 text-sm font-bold text-[#181008] transition-colors hover:bg-brand-dim"
       >
         메인으로 돌아가기
       </Link>

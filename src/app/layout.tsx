@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SearchBox } from "@/components/SearchBox";
 import { AuthStatus } from "@/components/AuthStatus";
 import { HeaderNav } from "@/components/HeaderNav";
+import { LegalLinks } from "@/components/LegalLinks";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -40,6 +41,7 @@ export default function RootLayout({
             겜피셜은 RAWG·Steam 등 공식 API 데이터와 자체 유저 리뷰만을 사용합니다.
             비공식 커뮤니티 크롤링은 하지 않습니다.
           </p>
+          <LegalLinks />
         </footer>
       </body>
     </html>

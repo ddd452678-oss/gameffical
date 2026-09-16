@@ -53,8 +53,8 @@ function ScalePicker({
             onClick={() => onChange(n)}
             className={`h-10 flex-1 rounded-xl text-sm font-bold transition-colors ${
               value === n
-                ? "bg-brand text-white"
-                : "bg-surface-2 text-text-dim hover:bg-[#e8eef7]"
+                ? "bg-brand text-[#181008]"
+                : "bg-surface-2 text-text-dim hover:bg-border"
             }`}
           >
             {n}
@@ -78,7 +78,7 @@ function LoginPrompt({ gameId }: { gameId: number }) {
       </p>
       <Link
         href={`/login?next=${encodeURIComponent(`/game/${gameId}`)}`}
-        className="inline-block h-11 w-full rounded-xl bg-brand px-4 py-2.5 text-sm font-bold leading-6 text-white transition-colors hover:bg-brand-dim"
+        className="inline-block h-11 w-full rounded-xl bg-brand px-4 py-2.5 text-sm font-bold leading-6 text-[#181008] transition-colors hover:bg-brand-dim"
       >
         로그인하고 리뷰 남기기
       </Link>
@@ -192,7 +192,7 @@ export function ReviewForm({
             type="button"
             onClick={handleDelete}
             disabled={deleting}
-            className="text-xs font-semibold text-[#d84343] hover:underline disabled:opacity-50"
+            className="text-xs font-semibold text-bad hover:underline disabled:opacity-50"
           >
             {deleting ? "삭제 중…" : "삭제"}
           </button>
@@ -200,7 +200,7 @@ export function ReviewForm({
       </div>
 
       {done && (
-        <p className="rounded-xl bg-[#e7f4ee] px-3 py-2.5 text-sm font-medium text-[#188652]">
+        <p className="rounded-xl bg-good/15 px-3 py-2.5 text-sm font-medium text-good">
           {isEdit ? "리뷰가 수정되었습니다." : "리뷰가 등록되었습니다. 감사합니다!"}
         </p>
       )}
@@ -268,7 +268,7 @@ export function ReviewForm({
       </div>
 
       {error && (
-        <p className="rounded-xl bg-[#fdeaea] px-3 py-2.5 text-sm font-medium text-[#d84343]">
+        <p className="rounded-xl bg-bad/15 px-3 py-2.5 text-sm font-medium text-bad">
           {error}
         </p>
       )}
@@ -276,7 +276,7 @@ export function ReviewForm({
       <button
         type="submit"
         disabled={submitting}
-        className="h-12 w-full rounded-xl bg-brand text-sm font-bold text-white transition-colors hover:bg-brand-dim disabled:opacity-50"
+        className="h-12 w-full rounded-xl bg-brand text-sm font-bold text-[#181008] transition-colors hover:bg-brand-dim disabled:opacity-50"
       >
         {submitting ? "저장 중…" : isEdit ? "수정 완료" : "리뷰 등록"}
       </button>

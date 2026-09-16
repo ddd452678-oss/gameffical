@@ -253,12 +253,12 @@ export function LoginForm() {
         </div>
 
         {error && (
-          <p className="rounded-xl bg-[#fdeaea] px-3 py-2.5 text-sm font-medium text-[#d84343]">
+          <p className="rounded-xl bg-bad/15 px-3 py-2.5 text-sm font-medium text-bad">
             {error}
           </p>
         )}
         {notice && (
-          <p className="rounded-xl bg-[#e7f4ee] px-3 py-2.5 text-sm font-medium text-[#188652]">
+          <p className="rounded-xl bg-good/15 px-3 py-2.5 text-sm font-medium text-good">
             {notice}
           </p>
         )}
@@ -266,7 +266,7 @@ export function LoginForm() {
         <button
           type="submit"
           disabled={busy}
-          className="h-12 w-full rounded-xl bg-brand text-sm font-bold text-white transition-colors hover:bg-brand-dim disabled:opacity-50"
+          className="h-12 w-full rounded-xl bg-brand text-sm font-bold text-[#181008] transition-colors hover:bg-brand-dim disabled:opacity-50"
         >
           {busy ? "처리 중…" : mode === "signin" ? "로그인" : "회원가입"}
         </button>

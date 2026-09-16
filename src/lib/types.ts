@@ -95,6 +95,9 @@ const RAWG_GENRE_KO: Record<string, string> = {
   Card: "카드",
 };
 
+/** 선호 장르 등록(마이페이지)에 쓰는 한국어 장르 목록. */
+export const GENRE_OPTIONS: string[] = Object.values(RAWG_GENRE_KO);
+
 /** 표시용 장르 목록: genres_ko(GRAC)가 있으면 그대로, 없으면 RAWG 장르를 번역해서 반환. */
 export function displayGenres(game: Game): string[] {
   if (game.genres_ko.length > 0) return game.genres_ko;

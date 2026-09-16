@@ -58,7 +58,7 @@ export function Pagination({
             href={hrefFor(p)}
             className={`min-w-9 rounded-lg px-3 py-2 text-center text-sm font-semibold transition-colors ${
               p === page
-                ? "bg-brand text-white"
+                ? "bg-brand text-[#181008]"
                 : "text-text-dim hover:bg-surface-2 hover:text-text"
             }`}
           >

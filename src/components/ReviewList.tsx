@@ -1,4 +1,5 @@
 import { Stars } from "./Stars";
+import { LikeButton } from "./LikeButton";
 import type { Review, ReviewStats } from "@/lib/types";
 
 export const COST_BURDEN_LABELS = [
@@ -103,6 +104,9 @@ export function ReviewList({
             )}
           </div>
           <p className="mt-2 text-sm whitespace-pre-wrap leading-relaxed">{r.body}</p>
+          <div className="mt-3">
+            <LikeButton target="review" targetId={r.id} />
+          </div>
         </li>
       ))}
     </ul>

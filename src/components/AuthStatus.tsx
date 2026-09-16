@@ -37,7 +37,7 @@ export function AuthStatus() {
     return (
       <Link
         href="/login"
-        className="shrink-0 rounded-xl bg-brand px-3.5 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-dim"
+        className="shrink-0 rounded-xl bg-brand px-3.5 py-2 text-sm font-bold text-[#181008] transition-colors hover:bg-brand-dim"
       >
         로그인
       </Link>
@@ -46,9 +46,12 @@ export function AuthStatus() {
 
   return (
     <div className="flex shrink-0 items-center gap-2 text-sm">
-      <span className="max-w-[7rem] truncate font-semibold text-text-dim">
+      <Link
+        href="/mypage"
+        className="max-w-[7rem] truncate font-semibold text-text-dim transition-colors hover:text-text"
+      >
         {getDisplayName(user)}
-      </span>
+      </Link>
       <button
         type="button"
         onClick={handleSignOut}

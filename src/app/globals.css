@@ -2,16 +2,18 @@
 @import "tailwindcss";
 
 :root {
-  /* 토스 스타일 라이트 팔레트 */
-  --bg: #f2f4f6; /* 페이지 배경 (토스 그레이) */
-  --surface: #ffffff; /* 카드 */
-  --surface-2: #f2f4f6; /* 입력창 · 세그먼트 등 옅은 채움 */
-  --border: #e5e8eb; /* 아주 옅은 경계선 */
-  --text: #191f28; /* 본문 (거의 검정) */
-  --text-dim: #6b7684; /* 보조 텍스트 */
-  --brand: #3182f6; /* 토스 블루 */
-  --brand-dim: #1b64da; /* 눌림 · hover */
-  --accent: #ffb020; /* 별점 골드 */
+  /* 게임 런처/콘솔 대시보드 팔레트 — 어두운 차콜 바탕에 호박색(트로피 골드) 하나만 강조색으로 */
+  --bg: #12151a; /* 페이지 배경 (딥 차콜) */
+  --surface: #1b1f27; /* 카드/패널 */
+  --surface-2: #242a35; /* 입력창 · hover 채움 */
+  --border: #2e3542; /* 헤어라인 경계선 */
+  --text: #edeff3; /* 본문 (오프화이트) */
+  --text-dim: #8b93a3; /* 보조 텍스트 */
+  --brand: #e8a33d; /* 트로피 골드 — 유일한 강조색 */
+  --brand-dim: #c4842a; /* 눌림 · hover */
+  --accent: #e8a33d; /* 별점 등 */
+  --good: #4caf7d; /* 성공/긍정 */
+  --bad: #e2596b; /* 오류/경고 */
 }
 
 @theme inline {
@@ -24,17 +26,19 @@
   --color-brand: var(--brand);
   --color-brand-dim: var(--brand-dim);
   --color-accent: var(--accent);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
 
-  /* 토스 특유의 옅은 그림자 */
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.04);
-  --shadow-card-hover: 0 2px 8px rgba(0, 0, 0, 0.08), 0 12px 28px rgba(0, 0, 0, 0.08);
+  /* 다크 UI 패널 느낌의 그림자 — 밝은 배경용 옅은 회색 그림자 대신 깊이감 있는 검은 글로우 */
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 6px 24px rgba(0, 0, 0, 0.45);
+  --shadow-card-hover: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 10px 32px rgba(0, 0, 0, 0.6);
 
-  --radius-xl: 16px;
-  --radius-2xl: 20px;
+  --radius-xl: 10px;
+  --radius-2xl: 14px;
 }
 
 html {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 body {
@@ -54,5 +58,5 @@ a {
 }
 
 ::selection {
-  background: rgba(49, 130, 246, 0.16);
+  background: rgba(232, 163, 61, 0.28);
 }

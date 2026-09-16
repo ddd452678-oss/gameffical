@@ -111,7 +111,7 @@ export default async function GameDetailPage({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-extrabold">{displayTitle(game)}</h1>
-              <span className="shrink-0 rounded-full bg-brand px-3 py-1 text-xs font-bold text-white">
+              <span className="shrink-0 rounded-full bg-brand px-3 py-1 text-xs font-bold text-[#181008]">
                 겜피셜 평점: {overall ?? "정보 없음"}
               </span>
               {isDiscontinued(game.name) && (
@@ -209,7 +209,7 @@ export default async function GameDetailPage({
               </MetaRow>
             </div>
             {scoreConfidenceNote(game) && (
-              <p className="mt-1.5 rounded-lg bg-[#fdf1dc] px-2.5 py-1.5 text-[11px] font-medium text-[#b26a00]">
+              <p className="mt-1.5 rounded-lg bg-brand/15 px-2.5 py-1.5 text-[11px] font-medium text-brand">
                 ⚠ {scoreConfidenceNote(game)}
               </p>
             )}
@@ -229,7 +229,7 @@ export default async function GameDetailPage({
                     href={l.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-brand-dim"
+                    className="rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-[#181008] transition-colors hover:bg-brand-dim"
                   >
                     {l.label} ↗
                   </a>
